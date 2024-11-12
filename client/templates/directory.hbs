@@ -22,10 +22,14 @@
       <span class="mtime" data-timestamp="{{mtime}}">{{age}}</span>
       <span class="size" data-size="{{size}}">{{psize}}</span>
       <span class="line-buttons">
+        {{#unless ../isGuest}}
         <span class="share-file tip tip-n" aria-label="Share">{{{svg "link"}}}</span>
+        {{/unless}}
         <a class="download tip tip-n" href="!/dl{{id}}" download="{{name}}" aria-label="Download">{{{svg "download"}}}</a>
+        {{#unless ../isGuest}}
         <span class="delete-file tip tip-nw" aria-label="Delete">{{{svg "trash"}}}</span>
         <span class="entry-menu tip tip-nw" aria-label="Actions">{{{svg "menu"}}}</span>
+        {{/unless}}
       </span>
     </div>
   {{/is}}
@@ -36,10 +40,14 @@
       <span class="mtime" data-timestamp="{{mtime}}">{{age}}</span>
       <span class="size" data-size="{{size}}">{{psize}}</span>
       <span class="line-buttons">
-        <span class="share-file tip tip-n" aria-label="Share">{{{svg "link"}}}</span>
+        {{#unless ../isGuest}}
+        <span class="share-file tip tip-n" aria-label="Share 2">{{{svg "link"}}}</span>
+        {{/unless}}
         <a class="zip tip tip-n" href="!/zip{{id}}" download="{{name}}" aria-label="Download zip">{{{svg "download"}}}</a>
+        {{#unless ../isGuest}}
         <span class="delete-file tip tip-nw" aria-label="Delete">{{{svg "trash"}}}</span>
         <span class="entry-menu tip tip-nw" aria-label="Actions">{{{svg "menu"}}}</span>
+        {{/unless}}
       </span>
     </div>
   {{/is}}
@@ -53,9 +61,11 @@
   {{#if isSearch}}
     <div class="noresults">No results</div>
   {{else}}
+    {{#unless ../isGuest}}
     <div id="empty" class="empty">
       {{{svg "upload-cloud"}}}
       <div class="text">Add files</div>
     </div>
+    {{/unless}}
   {{/if}}
 {{/each}}

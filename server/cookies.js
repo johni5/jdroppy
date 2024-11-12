@@ -26,13 +26,15 @@ cookies.get = function(cookie) {
   return entries.s;
 };
 
-cookies.free = function(_req, res, _postData) {
+cookies.free = function(_req, res, p) {
   const sessions = db.get("sessions");
   const sid = utils.createSid();
   // TODO: obtain path
   res.setHeader("Set-Cookie", cookieHeaders(sid, "/", inOneYear()));
   sessions[sid] = {
     privileged: true,
+    rootLocation: p.location,
+    guest: true,
     lastSeen: Date.now(),
   };
   db.set("sessions", sessions);
@@ -46,6 +48,8 @@ cookies.create = function(_req, res, postData) {
   sessions[sid] = {
     privileged: db.get("users")[postData.username].privileged,
     username: postData.username,
+    rootLocation: "/",
+    guest: false,
     lastSeen: Date.now(),
   };
   db.set("sessions", sessions);

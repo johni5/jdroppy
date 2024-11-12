@@ -292,22 +292,21 @@ function openSocket() {
   );
 
   droppy.socket.addEventListener("open", (_event) => {
-    if (droppy.token) {
+    ajax({url: "!/token", headers: {"x-app": "droppy"}}).then((res) => {
+      return res.text();
+    }).then((text) => {
+      const data = JSON.parse(text);
+      droppy.token = data.token;
+      droppy.guest = data.guest;
       init();
-    } else {
-      ajax({url: "!/token", headers: {"x-app": "droppy"}}).then((res) => {
-        return res.text();
-      }).then((text) => {
-        droppy.token = text;
-        init();
-      });
-    }
+    });
   });
   // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent#Close_codes
   droppy.socket.addEventListener("close", (event) => {
     if (event.code === 4000) return;
     if (event.code === 1011) {
       droppy.token = null;
+      droppy.guest = true;
       openSocket();
     } else if (event.code >= 1001 && event.code < 3999) {
       if (droppy.wsRetries > 0) {
@@ -340,6 +339,7 @@ function openSocket() {
           if (msg.folder !== getViewLocation(view)) {
             view[0].currentFile = null;
             view[0].currentFolder = msg.folder;
+            view[0].rootFolder = msg.rootLocation;
             if (view[0].vId === 0) setTitle(basename(msg.folder));
             replaceHistory(view, join(view[0].currentFolder, view[0].currentFile));
             updatePath(view);
@@ -809,7 +809,7 @@ function entryRename(view, entry, wasEmpty, callback) {
 function stopEdit(view, entry, wasEmpty) {
   entry.removeClass("editing invalid");
   view.find(".inline-namer, .data-row.new-file, .data-row.new-folder").remove();
-  if (wasEmpty) view.find(".content").html(Handlebars.templates.directory({entries: []}));
+  if (wasEmpty) view.find(".content").html(Handlebars.templates.directory({entries: [], guest: droppy.guest}));
 }
 
 function toggleCatcher(show) {
@@ -969,6 +969,8 @@ function updatePath(view) {
     li.off("click").on("click", function(event) {
       const view = $(event.target).parents(".view");
       if (droppy.socketWait) return;
+      if (!path.startsWith(view[0].rootFolder)) return;
+
       if ($(this).is(":last-child")) {
         if ($(this).parents(".view")[0].dataset.type === "directory") {
           updateLocation(view, this.dataset.destination);
@@ -1063,10 +1065,11 @@ function openDirectory(view, data, isSearch) {
   const sort = {type: "", mtime: "", size: ""};
   sort[sortBy] = `active ${view[0].sortAsc ? "up" : "down"}`;
 
-  const html = Handlebars.templates.directory({entries, sort, isSearch});
+  const html = Handlebars.templates.directory({entries, sort, isSearch, isGuest: droppy.guest});
   loadContent(view, "directory", null, html).then(() => {
     // Upload button on empty page
     view.find(".empty").off("click").on("click", (e) => {
+      if (droppy.guest) return;
       const view = $(e.target).parents(".view");
       const inp = view.find(".file");
       if (droppy.detects.directoryUpload) {
@@ -1096,16 +1099,18 @@ function openDirectory(view, data, isSearch) {
       this.setAttribute("order", index);
     });
 
-    view.find(".data-row").off("contextmenu").on("contextmenu", (e) => {
-      const target = $(e.currentTarget);
-      if (target[0].dataset.type === "error") return;
-      showEntryMenu(target, e.clientX, e.clientY);
-      e.preventDefault();
-    });
+    if (!droppy.guest) {
+      view.find(".data-row").off("contextmenu").on("contextmenu", (e) => {
+        const target = $(e.currentTarget);
+        if (target[0].dataset.type === "error") return;
+        showEntryMenu(target, e.clientX, e.clientY);
+        e.preventDefault();
+      });
 
-    view.find(".data-row .entry-menu").off("click").on("click", (e) => {
-      showEntryMenu($(e.target).parents(".data-row"), e.clientX, e.clientY);
-    });
+      view.find(".data-row .entry-menu").off("click").on("click", (e) => {
+        showEntryMenu($(e.target).parents(".data-row"), e.clientX, e.clientY);
+      });
+    }
 
     // Stop navigation when clicking on an <a>
     view.find(".data-row .zip, .data-row .download, .entry-link.file").off("click").on("click", (e) => {
@@ -1183,7 +1188,7 @@ function loadContent(view, type, mediaType, content) {
       view.find(".content:not(.new)").remove();
       view.find(".new").removeClass("new");
       view.find(".data-row").removeClass("animating");
-      if (view[0].dataset.type === "directory") {
+      if (view[0].dataset.type === "directory" && !droppy.guest) {
         bindDragEvents(view);
       }
       toggleButtons(view, type);
@@ -1193,7 +1198,8 @@ function loadContent(view, type, mediaType, content) {
 }
 
 function toggleButtons(view, type) {
-  view.find(".af, .ad, .cf, .cd")[type === "directory" ? "removeClass" : "addClass"]("disabled");
+  let className = droppy.guest ? "" : "disabled";
+  view.find(".af, .ad, .cf, .cd")[type === "directory" ? "removeClass" : "addClass"](className);
 }
 
 function handleDrop(view, event, src, dst, spinner) {
@@ -1258,6 +1264,8 @@ function sendDrop(view, type, src, dst, spinner) {
 
 // Set drag properties for internal drag sources
 function bindDragEvents(view) {
+  if (droppy.guest) return;
+
   view.find(".data-row .entry-link").each(function() {
     this.setAttribute("draggable", "true");
   });
@@ -1313,6 +1321,8 @@ function allowDrop(el) {
 }
 
 function bindHoverEvents(view) {
+  if (droppy.guest) return;
+
   const dropZone = view.find(".dropzone");
   view.off("dragenter").on("dragenter", (event) => {
     event.stopPropagation();
@@ -1336,6 +1346,8 @@ function bindHoverEvents(view) {
 }
 
 function bindDropEvents(view) {
+  if (droppy.guest) return;
+
   // file drop
   (new Uppie())(view[0], (e, fd, files) => {
     if (!files.length) return;
@@ -1403,7 +1415,7 @@ function initButtons(view) {
   view.off("click", ".ad").on("click", ".ad", function(e) {
     const view = $(e.target).parents(".view");
     if ($(this).hasClass("disabled")) {
-      showError(getView(0), "Your browser doesn't support directory uploading");
+      if (!droppy.guest) showError(getView(0), "Your browser doesn't support directory uploading");
     } else {
       // Set the directory attribute so we get a directory picker dialog
       droppy.dir.forEach((attr) => {
@@ -1441,7 +1453,8 @@ function initButtons(view) {
     });
   });
 
-  view.off("click", ".newview").on("click", ".newview", () => {
+  view.off("click", ".newview").on("click", ".newview", function(e) {
+    if ($(this).hasClass("disabled")) return;
     if (droppy.views.length === 1) {
       const dest = join(view[0].currentFolder, view[0].currentFile);
       replaceHistory(newView(dest, 1), dest);
@@ -1456,7 +1469,8 @@ function initButtons(view) {
     toggleCatcher();
   });
 
-  view.off("click", ".prefs").on("click", ".prefs", () => {
+  view.off("click", ".prefs").on("click", ".prefs", function(e) {
+    if ($(this).hasClass("disabled")) return;
     showPrefs();
     if (droppy.priv) sendMessage(null, "GET_USERS");
   });
@@ -1482,6 +1496,15 @@ function initButtons(view) {
       initAuthPage();
     });
   });
+
+  if (droppy.guest) {
+    view.find(".af").addClass("disabled");
+    view.find(".ad").addClass("disabled");
+    view.find(".cf").addClass("disabled");
+    view.find(".cd").addClass("disabled");
+    view.find(".prefs").addClass("disabled");
+    view.find(".newview").addClass("disabled");
+  }
 
   // Search Box
   function doSearch(e) {
@@ -1617,7 +1640,7 @@ function initEntryMenu() {
 
 // Check if there's something in the clipboard
 function checkClipboard() {
-  if (droppy.clipboard) {
+  if (droppy.clipboard && !droppy.guest) {
     $(".view").each(function() {
       const view = $(this), button = view.find(".paste-button");
       button.addClass("in").off("click").one("click", (event) => {
@@ -2651,6 +2674,7 @@ function initVariables() {
   droppy.socket = null;
   droppy.socketWait = null;
   droppy.token = null;
+  droppy.guest = true;
   droppy.views = [];
   droppy.wsRetries = 5;
   droppy.wsRetryTimeout = 4000;

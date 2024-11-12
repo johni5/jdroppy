@@ -440,7 +440,10 @@ function onWebSocketRequest(ws, req) {
     }
 
     const vId = msg.vId;
-    const priv = Boolean((db.get("sessions")[cookie] || {}).privileged);
+    const session = db.get("sessions")[cookie];
+    const priv = Boolean((session || {}).privileged);
+    const rootLocation = (session || {}).rootLocation || "/";
+    const isGuest = Boolean((session || {}).guest);
 
     if (msg.type === "REQUEST_SETTINGS") {
       sendObj(sid, {type: "SETTINGS", vId, settings: {
@@ -462,19 +465,24 @@ function onWebSocketRequest(ws, req) {
       fs.stat(utils.addFilesPath(msg.data), (err, stats) => {
         let clientDir, clientFile;
         if (err) { // Send client back to root when the requested path doesn't exist
-          clientDir = "/";
+          clientDir = rootLocation;
           clientFile = null;
           log.error(err);
           log.info(ws, null, `Non-existing update request, sending client to / : ${msg.data}`);
         } else if (stats.isFile()) {
           clientDir = path.dirname(msg.data);
           clientFile = path.basename(msg.data);
-          sendObj(sid, {type: "UPDATE_BE_FILE", file: clientFile, folder: clientDir, isFile: true, vId});
+          if (msg.data.startsWith(rootLocation)) {
+            sendObj(sid, {type: "UPDATE_BE_FILE", file: clientFile, folder: clientDir, isFile: true, vId, rootLocation: rootLocation});
+          } else {
+            clientDir = rootLocation;
+            clientFile = null;
+          }
         } else {
-          clientDir = msg.data;
+          clientDir = msg.data.startsWith(rootLocation) ? msg.data : rootLocation;
           clientFile = null;
         }
-        clients[sid].views[vId] = {file: clientFile, directory: clientDir};
+        clients[sid].views[vId] = {file: clientFile, directory: clientDir, rootLocation: rootLocation};
         if (!clientFile) {
           updateClientLocation(clientDir, sid, vId);
           sendFiles(sid, vId);
@@ -524,12 +532,12 @@ function onWebSocketRequest(ws, req) {
       });
     } else if (msg.type === "DELETE_FILE") {
       log.info(ws, null, `Deleting: ${msg.data}`);
-      if (config.readOnly) return sendError(sid, vId, "Files are read-only");
+      if (config.readOnly || isGuest) return sendError(sid, vId, "Files are read-only");
       if (!validatePaths(msg.data, msg.type, ws, sid, vId)) return;
       filetree.del(msg.data);
     } else if (msg.type === "SAVE_FILE") {
       log.info(ws, null, `Saving: ${msg.data.to}`);
-      if (config.readOnly) return sendError(sid, vId, "Files are read-only");
+      if (config.readOnly || isGuest) return sendError(sid, vId, "Files are read-only");
       if (!validatePaths(msg.data.to, msg.type, ws, sid, vId)) return;
       filetree.save(msg.data.to, msg.data.value, err => {
         if (err) {
@@ -558,19 +566,19 @@ function onWebSocketRequest(ws, req) {
         }
       });
     } else if (msg.type === "CREATE_FOLDER") {
-      if (config.readOnly) return sendError(sid, vId, "Files are read-only");
+      if (config.readOnly || isGuest) return sendError(sid, vId, "Files are read-only");
       if (!validatePaths(msg.data, msg.type, ws, sid, vId)) return;
       filetree.mkdir(msg.data, err => {
         if (err) sendError(sid, vId, `Error creating folder: ${err.message}`);
       });
     } else if (msg.type === "CREATE_FILE") {
-      if (config.readOnly) return sendError(sid, vId, "Files are read-only");
+      if (config.readOnly || isGuest) return sendError(sid, vId, "Files are read-only");
       if (!validatePaths(msg.data, msg.type, ws, sid, vId)) return;
       filetree.mk(msg.data, err => {
         if (err) sendError(sid, vId, `Error creating file: ${err.message}`);
       });
     } else if (msg.type === "RENAME") {
-      if (config.readOnly) return sendError(sid, vId, "Files are read-only");
+      if (config.readOnly || isGuest) return sendError(sid, vId, "Files are read-only");
       const rSrc = msg.data.src;
       const rDst = msg.data.dst;
       // Disallow whitespace-only and empty strings in renames
@@ -714,9 +722,10 @@ function validatePaths(paths, type, ws, sid, vId) {
 function sendFiles(sid, vId) {
   if (!clients[sid] || !clients[sid].views[vId] || !clients[sid].ws || !clients[sid].ws._socket) return;
   const folder = clients[sid].views[vId].directory;
+  const rootLocation = clients[sid].views[vId].rootLocation;
   sendObj(sid, {
     type: "UPDATE_DIRECTORY",
-    vId, folder,
+    vId, folder, rootLocation,
     data: filetree.ls(folder)
   });
 }
@@ -752,7 +761,11 @@ function sendError(sid, vId, text) {
 }
 
 function redirectToRoot(req, res) {
-  res.writeHead(307, {Location: "/", "Cache-Control": "public, max-age=0"});
+  redirectTo(req, res, "/")
+}
+
+function redirectTo(req, res, path) {
+  res.writeHead(307, {Location: path, "Cache-Control": "public, max-age=0"});
   res.end();
   log.info(req, res);
   return;
@@ -776,6 +789,24 @@ function send(ws, data) {
       setTimeout(queue, 50, ws, data, time + 50);
     }
   })(ws, data, 0);
+}
+
+function currentSession(req, readOnly = true) {
+  return new Promise((resolve, reject) => {
+    const sessions = db.get("sessions");
+    let session = sessions[cookies.get(req.headers.cookie)];
+    if (session) {
+      resolve(session);
+      if (!readOnly) db.set("sessions", sessions);
+    } else reject('User expected')
+  });
+}
+
+function isGuestSession(req) {
+  const sessions = db.get("sessions");
+  let session = sessions[cookies.get(req.headers.cookie)];
+  if (session) return session.guest;
+  return true;
 }
 
 function handleGETandHEAD(req, res) {
@@ -830,7 +861,10 @@ function handleGETandHEAD(req, res) {
         "Cache-Control": "private, no-store, max-age=0",
         "Content-Type": "text/plain; charset=utf-8"
       });
-      res.end(csrf.create(req));
+      res.end(JSON.stringify({
+        token: csrf.create(req),
+        guest: isGuestSession(req)
+      }));
     } else {
       res.statusCode = 401;
       res.end();
@@ -1052,7 +1086,7 @@ function handleResourceRequest(req, res, resourceName) {
 
 function handleFileRequest(req, res, download) {
   const URI = decodeURIComponent(req.url);
-  let shareLink, filepath;
+  let shareLink, filepath, location;
 
   let parts = /^\/\$\/([a-z0-9]+)\.?([a-z0-9.]+)?$/i.exec(URI);
   if (parts && parts[1]) { // check for sharelink
@@ -1060,6 +1094,7 @@ function handleFileRequest(req, res, download) {
     if (!link) return redirectToRoot(req, res);
     shareLink = true;
     download = link.attachement;
+    location = link.location;
     filepath = utils.addFilesPath(link.location);
   } else { // it's a direct file request
     if (!validateRequest(req)) {
@@ -1076,7 +1111,12 @@ function handleFileRequest(req, res, download) {
   fs.stat(filepath, (error, stats) => {
     if (!error && stats) {
       if (stats.isDirectory() && shareLink) {
-        streamArchive(req, res, filepath, download, stats, shareLink);
+        if(download) {
+          streamArchive(req, res, filepath, download, stats, shareLink);
+        } else {
+          cookies.free(req, res, {location: location});
+          redirectTo(req, res, `/#${location}`)
+        }
       } else {
         streamFile(req, res, filepath, download, stats, shareLink);
       }
@@ -1115,7 +1155,7 @@ async function handleTypeRequest(req, res, file) {
 function handleUploadRequest(req, res) {
   let done = false;
 
-  if (config.readOnly) {
+  if (config.readOnly || isGuestSession(req)) {
     res.statusCode = 403;
     res.end();
     log.info(req, res, "Upload cancelled because of read-only mode");

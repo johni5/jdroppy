@@ -4,3 +4,6 @@ dist
 client/jquery*
 yarn.lock
 package-lock.json
+*.iml
+*.ipr
+*.iws
