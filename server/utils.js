@@ -183,7 +183,7 @@ utils.contentType = function(p) {
     return type + (charset ? `; charset=${charset}` : "");
   } else {
     try {
-      return isbinaryfile.isBinaryFileSync(p) ? "application/octet-stream" : "text/plain";
+      return isbinaryfile.isBinaryFileSync(p) ? "application/octet-stream" : "text/plain; charset=utf-8";
     } catch {
       return "application/octet-stream";
     }

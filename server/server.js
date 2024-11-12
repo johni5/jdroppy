@@ -765,7 +765,7 @@ function redirectToRoot(req, res) {
 }
 
 function redirectTo(req, res, path) {
-  res.writeHead(307, {Location: path, "Cache-Control": "public, max-age=0"});
+  res.writeHead(307, {Location: encodeURI(path), "Cache-Control": "public, max-age=0"});
   res.end();
   log.info(req, res);
   return;
@@ -896,7 +896,7 @@ function handlePOST(req, res) {
   const URI = decodeURIComponent(req.url);
   // unauthenticated POSTs
   if (/^\/!\/login/.test(URI)) {
-    res.setHeader("Content-Type", "text/plain");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
 
     // Rate-limit login attempts to one attempt every 2 seconds
     const ip = utils.ip(req);
@@ -932,7 +932,7 @@ function handlePOST(req, res) {
     });
     return;
   } else if (firstRun && /^\/!\/adduser/.test(URI)) {
-    res.setHeader("Content-Type", "text/plain");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
     utils.readJsonBody(req).then(postData => {
       if (postData.username && postData.password &&
           typeof postData.username === "string" &&
@@ -967,7 +967,7 @@ function handlePOST(req, res) {
   if (/^\/!\/upload/.test(URI)) {
     handleUploadRequest(req, res);
   } else if (/^\/!\/logout$/.test(URI)) {
-    res.setHeader("Content-Type", "text/plain");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
     utils.readJsonBody(req).then(postData => {
       cookies.unset(req, res, postData);
       res.statusCode = 200;
