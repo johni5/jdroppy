@@ -18,6 +18,7 @@ const sendFile = require("send");
 const ut = require("untildify");
 const Wss = require("ws").Server;
 const yazl = require("yazl");
+const sharp = require("sharp");
 
 const cfg = require("./cfg.js");
 const cookies = require("./cookies.js");
@@ -874,6 +875,8 @@ function handleGETandHEAD(req, res) {
     handleTypeRequest(req, res, utils.addFilesPath(URI.substring(7)));
   } else if (/^\/!\/file\/[\s\S]+/.test(URI)) {
     handleFileRequest(req, res, false);
+  } else if (/^\/!\/thumb\/[\s\S]+/.test(URI)) {
+    handleFileRequest(req, res, false);
   } else if (/^\/!\/zip\/[\s\S]+/.test(URI)) {
     const zipPath = utils.addFilesPath(URI.substring(6));
     fs.stat(zipPath, (err, stats) => {
@@ -1105,7 +1108,33 @@ function handleFileRequest(req, res, download) {
       return redirectToRoot(req, res);
     }
     download = parts[1] === "dl";
-    filepath = utils.addFilesPath(`/${[parts[2]]}`);
+    if (parts[1] === "thumb") {
+      filepath = utils.addThumbsPath(`/${[parts[2]]}`);
+      fs.stat(filepath, (error, stats) => {
+        if (error && error.code === "ENOENT") {
+          const dir = path.dirname(filepath);
+          fs.mkdir(dir, {recursive: true}, err => {
+            sharp(utils.addFilesPath(`/${[parts[2]]}`))
+              .resize(150, 150, {
+                fit: "inside",
+                position: "center"
+              })
+              .toFile(filepath, (err, inf) => {
+                if (!err) {
+                  fs.stat(filepath, (e, s) => {
+                    streamFile(req, res, filepath, false, s, false);
+                  });
+                }
+              });
+          });
+        } else {
+          streamFile(req, res, filepath, false, stats, false);
+        }
+      });
+      return;
+    } else {
+      filepath = utils.addFilesPath(`/${[parts[2]]}`);
+    }
   }
 
   fs.stat(filepath, (error, stats) => {
@@ -1478,8 +1507,11 @@ function streamFile(req, res, filepath, download, stats, shareLink) {
   }
 
   // send expects a url-encoded argument
-  sendFile(req, encodeURIComponent(utils.removeFilesPath(filepath).substring(1)), {
-    root: paths.files,
+  let encoded = encodeURIComponent(utils.removeFilesPath(filepath).substring(1));
+  const root = filepath.indexOf(paths.thumbs) === -1 ? paths.files : paths.thumbs;
+
+  sendFile(req, encoded, {
+    root: root,
     dotfiles: "allow",
     index: false,
     etag: false,

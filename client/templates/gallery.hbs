@@ -1,0 +1,29 @@
+<div class="gallery">
+  {{#each entries}}
+  <div class="gallery-item">
+    {{#is type "f"}}
+    <div class="data-row" data-type="file" data-id="{{id}}">
+      {{#if viewableImage}}
+      <a class="file-link entry-link" href="!/dl{{id}}" download="{{name}}" data-name="{{name}}" title="{{name}}">
+        <img src="!/thumb{{id}}" alt="{{name}}" data-name="{{name}}">
+      </a>
+      {{else}}
+      <a class="sprite sprite-{{sprite}} file-link entry-link" href="!/dl{{id}}" download="{{name}}" data-name="{{name}}" title="{{name}}"></a>
+      {{/if}}
+    </div>
+    {{/is}}
+
+    {{#is type "d"}}
+    <div class="data-row" data-type="folder" data-id="{{id}}">
+      <span class="sprite sprite-folder folder-link"></span>
+    </div>
+    {{/is}}
+
+    {{#is type "e"}}
+    <div class="data-row" data-type="error" data-id="{{id}}">
+      <a class="{{sprite}} error-link entry-link" data-name="{{name}}"></a>
+    </div>
+    {{/is}}
+  </div>
+  {{/each}}
+</div>

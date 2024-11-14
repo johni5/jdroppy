@@ -192,6 +192,20 @@ droppy.del = function(pref) {
   delete prefs[pref];
   savePrefs(prefs);
 };
+
+droppy.viewMode = {};
+
+droppy.toggleViewMode = function (path) {
+  let mode = droppy.getViewMode(path);
+  if (mode === "list") mode = "gallery";
+  else mode = "list";
+  droppy.viewMode[path] = mode;
+};
+
+droppy.getViewMode = function (path) {
+  return droppy.viewMode[path] || "list";
+};
+
 // ============================================================================
 //  Entry point
 // ============================================================================
@@ -240,6 +254,12 @@ function newView(dest, vId) {
   view.appendTo("main");
   view[0].vId = vId;
   view[0].uploadId = 0;
+  view[0].mode = "list";
+
+  view[0].toggleMode = function () {
+    if (this.mode === "gallery") this.mode = "list";
+    else this.mode = "gallery";
+  };
 
   if (dest) updateLocation(view, dest);
   initButtons(view);
@@ -1065,7 +1085,10 @@ function openDirectory(view, data, isSearch) {
   const sort = {type: "", mtime: "", size: ""};
   sort[sortBy] = `active ${view[0].sortAsc ? "up" : "down"}`;
 
-  const html = Handlebars.templates.directory({entries, sort, isSearch, isGuest: droppy.guest});
+  const listMode = droppy.getViewMode(view[0].currentFolder) === "list";
+  const templateName = listMode ? "directory" : "gallery";
+
+  const html = Handlebars.templates[templateName]({entries, sort, isSearch, isGuest: droppy.guest});
   loadContent(view, "directory", null, html).then(() => {
     // Upload button on empty page
     view.find(".empty").off("click").on("click", (e) => {
@@ -1091,7 +1114,8 @@ function openDirectory(view, data, isSearch) {
     view.find(".file-link").off("click").on("click", function(e) {
       if (droppy.socketWait) return;
       const view = $(e.target).parents(".view");
-      openFile(view, view[0].currentFolder, e.target.textContent.trim(), {ref: this});
+      console.log(e.target)
+      openFile(view, view[0].currentFolder, e.target.dataset.name.trim(), {ref: this});
       e.preventDefault();
     });
 
@@ -1483,6 +1507,14 @@ function initButtons(view) {
     });
   });
 
+  view.off("click", ".mode").on("click", ".mode", () => {
+    console.log("Click eye")
+    droppy.toggleViewMode(view[0].currentFolder);
+    sendMessage(view[0].vId, "RELOAD_DIRECTORY", {
+      dir: view[0].currentFolder
+    });
+  });
+
   view.off("click", ".logout").on("click", ".logout", () => {
     ajax({
       method: "POST",
@@ -1563,7 +1595,7 @@ function initEntryMenu() {
     const view = entry.parents(".view");
 
     toggleCatcher(false);
-    openFile(view, view[0].currentFolder, entry.find(".file-link")[0].textContent, {text: true});
+    openFile(view, view[0].currentFolder, entry.find(".file-link")[0].dataset.name, {text: true});
   });
 
   // Click on a "open" link
@@ -1577,7 +1609,7 @@ function initEntryMenu() {
     if (entry[0].dataset.type === "folder") {
       updateLocation(view, entry[0].dataset.id);
     } else {
-      openFile(view, view[0].currentFolder, entry.find(".file-link")[0].textContent);
+      openFile(view, view[0].currentFolder, entry.find(".file-link")[0].dataset.name);
     }
   });
 
@@ -1726,6 +1758,10 @@ function closeDoc(view) {
 }
 
 function openFile(view, newFolder, file, opts) {
+  console.log(view);
+  console.log(newFolder);
+  console.log(file);
+  console.log(opts);
   opts = opts || {};
   clearSearch(view);
   const e = fileExtension(file);

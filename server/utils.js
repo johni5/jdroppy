@@ -134,11 +134,19 @@ utils.addFilesPath = function(p) {
   return p === "/" ? paths.files : path.join(`${paths.files}/${p}`);
 };
 
+utils.addThumbsPath = function(p) {
+  return p === "/" ? paths.thumbs : path.join(`${paths.thumbs}/${p}`);
+};
+
 utils.removeFilesPath = function(p) {
-  if (p.length > paths.files.length) {
-    return utils.normalizePath(p.substring(paths.files.length));
-  } else if (p === paths.files) {
-    return "/";
+  if (p.indexOf(paths.thumbs) === -1) {
+    if (p.length > paths.files.length) {
+      return utils.normalizePath(p.substring(paths.files.length));
+    } else if (p === paths.files) {
+      return "/";
+    }
+  } else {
+    return utils.normalizePath(p.substring(paths.thumbs.length));
   }
 };
 

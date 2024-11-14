@@ -581,6 +581,7 @@ nav {
 .logout:hover  { color: rgb(255, 82, 82) }
 .newview:hover { color: rgb(255,166,100) }
 .reload:hover  { color: rgb( 70,140,240) }
+.mode .eye:hover     { color: rgb(255,212,102) }
 
 .reload { display: none; }
 .nowatch .view[data-type="directory"] .reload { display: flex; }
@@ -1550,4 +1551,49 @@ html:not(.mobile) #drop-select span.active {
 
 .pdf-container > canvas {
   padding: 1px;
+}
+
+.gallery-item {
+  display: inline-block;
+  width: 150px;
+  height: 150px;
+  text-align: center;
+  margin: 5px;
+  overflow: hidden;
+  vertical-align: center;
+  border: 1px solid #c1bac3;
+  position: relative;
+}
+
+.gallery-item img {
+  position: relative;
+  transform: scale(0.95);
+}
+
+.gallery-item:hover {
+  border: 1px solid #fff;
+}
+
+.gallery-item img:hover {
+  transform: scale(1);
+}
+
+.gallery-item > * {
+  display: flex;
+  align-items: center;
+}
+
+.gallery-item .sprite {
+  margin: 0 auto;
+  cursor: pointer;
+}
+
+.gallery-item .data-row {
+  height: 100%;
+}
+
+.gallery-item .entry-link {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }

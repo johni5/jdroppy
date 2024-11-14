@@ -7,11 +7,13 @@ const untildify = require("untildify");
 
 let configDir = "~/.droppy/config";
 let filesDir = "~/.droppy/files";
+let thumbDir = "~/.droppy/thumbs";
 
 paths.get = function() {
   return {
     files: resolve(filesDir),
     config: resolve(configDir),
+    thumbs: resolve(thumbDir),
 
     pid: resolve(configDir, "droppy.pid"),
     temp: resolve(configDir, "temp"),
