@@ -1,21 +1,28 @@
 <div class="gallery">
   {{#each entries}}
-  <div class="gallery-item">
+  <div class="gallery-item item-type-{{sprite}}">
     {{#is type "f"}}
     <div class="data-row" data-type="file" data-id="{{id}}">
       {{#if viewableImage}}
       <a class="file-link entry-link" href="!/dl{{id}}" download="{{name}}" data-name="{{name}}" title="{{name}}">
         <img src="!/thumb{{id}}" alt="{{name}}" data-name="{{name}}">
+        <span class="entry-name">{{name}}</span>
       </a>
       {{else}}
-      <a class="sprite sprite-{{sprite}} file-link entry-link" href="!/dl{{id}}" download="{{name}}" data-name="{{name}}" title="{{name}}"></a>
+      <a class="file-link entry-link" href="!/dl{{id}}" download="{{name}}" data-name="{{name}}" title="{{name}}">
+        <span class="sprite sprite-{{sprite}}"></span>
+        <span class="entry-name">{{name}}</span>
+      </a>
       {{/if}}
     </div>
     {{/is}}
 
     {{#is type "d"}}
-    <div class="data-row" data-type="folder" data-id="{{id}}">
-      <span class="sprite sprite-folder folder-link"></span>
+    <div class="data-row" data-type="folder" data-id="{{id}}" title="{{name}}">
+      <a class="folder-link">
+        <span class="sprite sprite-folder"></span>
+        <span class="folder-name entry-link">{{name}}</span>
+      </a>
     </div>
     {{/is}}
 

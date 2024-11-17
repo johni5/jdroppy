@@ -1108,7 +1108,7 @@ function handleFileRequest(req, res, download) {
       return redirectToRoot(req, res);
     }
     download = parts[1] === "dl";
-    if (parts[1] === "thumb") {
+    if (parts[1] === "thumb" && !parts[2].endsWith(".svg")) {
       filepath = utils.addThumbsPath(`/${[parts[2]]}`);
       fs.stat(filepath, (error, stats) => {
         if (error && error.code === "ENOENT") {

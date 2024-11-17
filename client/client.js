@@ -1111,11 +1111,16 @@ function openDirectory(view, data, isSearch) {
     });
 
     // Click on a file link
-    view.find(".file-link").off("click").on("click", function(e) {
+    view.find(".file-link").off("click").on("click", function (e) {
       if (droppy.socketWait) return;
       const view = $(e.target).parents(".view");
-      console.log(e.target)
-      openFile(view, view[0].currentFolder, e.target.dataset.name.trim(), {ref: this});
+      let link = e.target;
+      if (!link.classList.contains("file-link")) {
+        link = $(e.target).parents(".file-link")[0];
+      }
+      if (link.dataset.name) {
+        openFile(view, view[0].currentFolder, link.dataset.name.trim(), {ref: this});
+      }
       e.preventDefault();
     });
 
@@ -1508,7 +1513,6 @@ function initButtons(view) {
   });
 
   view.off("click", ".mode").on("click", ".mode", () => {
-    console.log("Click eye")
     droppy.toggleViewMode(view[0].currentFolder);
     sendMessage(view[0].vId, "RELOAD_DIRECTORY", {
       dir: view[0].currentFolder
@@ -1715,9 +1719,12 @@ function showEntryMenu(entry, x, y) {
   const maxLeft = window.innerWidth - menu[0].clientWidth - 4;
   const top = entry[0].getBoundingClientRect().top + document.body.scrollTop;
   const left = x - menu[0].clientWidth / 2;
-  const spriteClass = entry.find(".sprite")[0].className;
+  const $sprite = entry.find(".sprite");
+  if ($sprite[0]) {
+    const spriteClass = $sprite[0].className;
+    menu[0].className = `type-${/sprite-(\w+)/.exec(spriteClass)[1]}`;
+  }
 
-  menu[0].className = `type-${/sprite-(\w+)/.exec(spriteClass)[1]}`;
   entry.addClass("active");
   toggleCatcher(true);
   menu[0].style.left = `${left > 0 ? (left > maxLeft ? maxLeft : left) : 0}px`;
@@ -1758,10 +1765,6 @@ function closeDoc(view) {
 }
 
 function openFile(view, newFolder, file, opts) {
-  console.log(view);
-  console.log(newFolder);
-  console.log(file);
-  console.log(opts);
   opts = opts || {};
   clearSearch(view);
   const e = fileExtension(file);
