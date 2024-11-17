@@ -31,9 +31,10 @@ paths.get = function() {
   };
 };
 
-paths.seed = function(config, files) {
+paths.seed = function(config, files, thumbs) {
   if (config) configDir = config;
   if (files) filesDir = files;
+  if (thumbs) thumbDir = thumbs;
 };
 
 function resolve(...args) {

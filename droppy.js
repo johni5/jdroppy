@@ -33,6 +33,7 @@ const cmds = {
 const opts = {
   configdir: "-c, --configdir <dir>  Config directory. Default: ~/.droppy/config",
   filesdir: "-f, --filesdir <dir>   Files directory. Default: ~/.droppy/files",
+  thumbsdir: "-t, --thumbsdir <dir>   Thumbs directory. Default: ~/.droppy/thumbs",
   daemon: "-d, --daemon           Daemonize (background) process",
   log: "-l, --log <file>       Log to file instead of stdout",
   dev: "--dev                  Enable developing mode",
@@ -57,8 +58,8 @@ if (argv._[0] === "build") {
   });
 }
 
-if (argv.configdir || argv.filesdir || argv.c || argv.f) {
-  require("./server/paths.js").seed(argv.configdir || argv.c, argv.filesdir || argv.f);
+if (argv.configdir || argv.filesdir || argv.thumbsdir || argv.c || argv.f || argv.t) {
+  require("./server/paths.js").seed(argv.configdir || argv.c, argv.filesdir || argv.f, argv.thumbsdir || argv.t);
 }
 
 if (argv.log || argv.l) {
