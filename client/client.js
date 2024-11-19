@@ -195,11 +195,20 @@ droppy.del = function(pref) {
 
 droppy.viewMode = {};
 
+droppy.galleryViewMode = function (path) {
+  droppy.viewMode[path] = "gallery";
+}
+
+droppy.listViewMode = function (path) {
+  droppy.viewMode[path] = "list";
+}
+
 droppy.toggleViewMode = function (path) {
   let mode = droppy.getViewMode(path);
   if (mode === "list") mode = "gallery";
   else mode = "list";
   droppy.viewMode[path] = mode;
+  return mode;
 };
 
 droppy.getViewMode = function (path) {
@@ -254,12 +263,6 @@ function newView(dest, vId) {
   view.appendTo("main");
   view[0].vId = vId;
   view[0].uploadId = 0;
-  view[0].mode = "list";
-
-  view[0].toggleMode = function () {
-    if (this.mode === "gallery") this.mode = "list";
-    else this.mode = "gallery";
-  };
 
   if (dest) updateLocation(view, dest);
   initButtons(view);
@@ -716,10 +719,7 @@ function upload(view, fd, files) {
   view[0].isUploading = true;
   view[0].uploadStart = performance.now();
 
-  xhr.open("POST", `${getRootPath()}!/upload?vId=${view[0].vId
-  }&to=${encodeURIComponent(view[0].currentFolder)
-  }&rename=${rename ? "1" : "0"}`
-  );
+  xhr.open("POST", `${getRootPath()}!/upload?vId=${view[0].vId}&to=${encodeURIComponent(view[0].currentFolder)}&rename=${rename ? "1" : "0"}`);
   xhr.responseType = "text";
   xhr.send(fd);
 }
@@ -1217,6 +1217,11 @@ function loadContent(view, type, mediaType, content) {
       view.find(".content:not(.new)").remove();
       view.find(".new").removeClass("new");
       view.find(".data-row").removeClass("animating");
+      view.find(".content").addClass(droppy.getViewMode(view[0].currentFolder) + "-mode");
+
+      view.find(".view-mode").addClass("show");
+      view.find(".mode-" + droppy.getViewMode(view[0].currentFolder)).removeClass("show");
+
       if (view[0].dataset.type === "directory" && !droppy.guest) {
         bindDragEvents(view);
       }
@@ -1314,7 +1319,8 @@ function bindDragEvents(view) {
     }));
     event.originalEvent.dataTransfer.effectAllowed = "copyMove";
     if ("setDragImage" in event.originalEvent.dataTransfer) {
-      event.originalEvent.dataTransfer.setDragImage(row.find(".sprite")[0], 0, 0);
+      let dragElement = row.find(".sprite")[0];
+      if (dragElement) event.originalEvent.dataTransfer.setDragImage(dragElement, 0, 0);
     }
   });
 }
@@ -1379,6 +1385,9 @@ function bindDropEvents(view) {
 
   // file drop
   (new Uppie())(view[0], (e, fd, files) => {
+    // ignore uploading if drag between views
+    if (e.dataTransfer.getData("text")) return;
+
     if (!files.length) return;
     if (droppy.readOnly) return showError(view, "Files are read-only.");
     e.stopPropagation();
@@ -1468,7 +1477,8 @@ function initButtons(view) {
     const content = view.find(".content");
     const isFile = this.classList.contains("cf");
     const isEmpty = Boolean(view.find(".empty").length);
-    const html = Handlebars.templates[isFile ? "new-file" : "new-folder"]();
+    const galleryMode = (droppy.getViewMode(view[0].currentFolder) === "gallery");
+    const html = Handlebars.templates[isFile ? "new-file" : "new-folder"]({gallery: galleryMode});
 
     stopEdit(view, view.find(".editing"), isEmpty);
     if (isEmpty) content.html(Handlebars.templates["file-header"]());
@@ -1512,8 +1522,15 @@ function initButtons(view) {
     });
   });
 
-  view.off("click", ".mode").on("click", ".mode", () => {
-    droppy.toggleViewMode(view[0].currentFolder);
+  view.off("click", ".mode-list").on("click", ".mode-list", () => {
+    droppy.listViewMode(view[0].currentFolder);
+    sendMessage(view[0].vId, "RELOAD_DIRECTORY", {
+      dir: view[0].currentFolder
+    });
+  });
+
+  view.off("click", ".mode-gallery").on("click", ".mode-gallery", () => {
+    droppy.galleryViewMode(view[0].currentFolder);
     sendMessage(view[0].vId, "RELOAD_DIRECTORY", {
       dir: view[0].currentFolder
     });
@@ -2294,6 +2311,11 @@ function showPrefs() {
     opts[4].values = {"Wrap": true, "No Wrap": false};
     opts[5].values = {"Default On": true, "Default Off": false};
     return Handlebars.templates.options({opts});
+  });
+
+  $(".clear-cache").off("click").on("click", function (event) {
+    event.stopPropagation();
+    sendMessage(null, "CLEAR_CACHE");
   });
 
   $("select.theme").off("change").on("change", function() {

@@ -109,10 +109,15 @@ nav {
   transform: translateX(0);
 }
 
-.content.directory {
+.content.list-mode {
   background: #eee;
   display: flex;
   flex-direction: column;
+}
+
+.content.gallery-mode {
+  background: #eee;
+  display: block;
 }
 
 .content.media, .content.document {
@@ -581,7 +586,8 @@ nav {
 .logout:hover  { color: rgb(255, 82, 82) }
 .newview:hover { color: rgb(255,166,100) }
 .reload:hover  { color: rgb( 70,140,240) }
-.mode .eye:hover     { color: rgb(255,212,102) }
+.list-view:hover   { color: rgb(255,212,102) }
+.gallery-view:hover { color: rgb(255,212,102) }
 
 .reload { display: none; }
 .nowatch .view[data-type="directory"] .reload { display: flex; }
@@ -589,6 +595,15 @@ nav {
 .button.disabled       { color: #444 !important; cursor: not-allowed !important }
 .button.disabled:hover { color: #444 !important; background: transparent !important }
 .button.disabled:hover svg { fill: #444 !important }
+
+.view-mode {
+  display: none;
+}
+
+.view-mode.show {
+  display: inherit;
+}
+
 
 /* ============================ Entry Menu ============================ */
 
@@ -1577,6 +1592,8 @@ html:not(.mobile) #drop-select span.active {
 .gallery-item img {
   position: relative;
   transform: scale(0.95);
+  max-width: 150px;
+  max-height: 150px;
 }
 
 .gallery-item:hover {
@@ -1608,7 +1625,7 @@ html:not(.mobile) #drop-select span.active {
 
 .gallery-item .folder-name {
   position: absolute;
-  bottom: 5px;
+  bottom: 0;
   display: flex;
   text-align: center;
   width: 100%;
@@ -1620,9 +1637,10 @@ html:not(.mobile) #drop-select span.active {
 
 .gallery-item .inline-namer {
   position: absolute;
-  bottom: 5px;
+  bottom: 0;
   width: 100%;
   font-size: 12px;
+  text-align: center;
 }
 
 .gallery-item .folder-link {
@@ -1632,7 +1650,7 @@ html:not(.mobile) #drop-select span.active {
 
 .gallery-item .entry-name {
   position: absolute;
-  bottom: 5px;
+  bottom: 0;
   display: flex;
   text-align: center;
   width: 100%;
@@ -1649,10 +1667,22 @@ html:not(.mobile) #drop-select span.active {
   display: flex;
 }
 
+.gallery-item .data-row.editing .folder-name.entry-link {
+  display: none;
+}
+
 .gallery-item .data-row.editing .entry-link .entry-name {
   display: none;
 }
 
 .gallery-item .data-row.editing {
   background: none!important;
+}
+
+.button.clear-cache {
+  color: #555;
+}
+
+.button.clear-cache:hover {
+  color: #f44;
 }

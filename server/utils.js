@@ -29,13 +29,13 @@ const overrideMimeTypes = {
 
 utils.mkdir = async function(dir, cb) {
   for (const d of (Array.isArray(dir) ? dir : [dir])) {
-    await mkdir(d, {mode: "755", recursive: true});
+    await mkdir(d, {mode: "755", recursive: true}, function(){});
   }
-  cb();
+  if(cb) cb();
 };
 
 utils.rm = function(p, cb) {
-  fs.rm(p, {recursive: true}, cb);
+  fs.rm(p, {force:true, recursive: true}, cb || function (){});
 };
 
 utils.move = function(src, dst, cb) {

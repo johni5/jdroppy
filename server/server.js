@@ -496,6 +496,8 @@ function onWebSocketRequest(ws, req) {
       });
     } else if (msg.type === "DESTROY_VIEW") {
       clients[sid].views[vId] = null;
+    } else if (msg.type === "CLEAR_CACHE") {
+      clearCache();
     } else if (msg.type === "REQUEST_SHARELINK") {
       if (!validatePaths(msg.data.location, msg.type, ws, sid, vId)) return;
       const links = db.get("links");
@@ -706,6 +708,18 @@ function onWebSocketRequest(ws, req) {
   ws.on("error", log.error);
 }
 
+async function clearCache() {
+  const dir = utils.addThumbsPath("/");
+  try {
+    await fs.rm(dir, {force: true, recursive: true}, function () {
+      fs.mkdir(dir, {force: true, mode: "755", recursive: true}, function () {});
+    });
+    log.info("Cache cleared successfully");
+  } catch (e) {
+    log.error(e);
+  }
+}
+
 // Ensure that a given path does not contain invalid file names
 function validatePaths(paths, type, ws, sid, vId) {
   return (Array.isArray(paths) ? paths : [paths]).every(p => {
@@ -790,17 +804,6 @@ function send(ws, data) {
       setTimeout(queue, 50, ws, data, time + 50);
     }
   })(ws, data, 0);
-}
-
-function currentSession(req, readOnly = true) {
-  return new Promise((resolve, reject) => {
-    const sessions = db.get("sessions");
-    let session = sessions[cookies.get(req.headers.cookie)];
-    if (session) {
-      resolve(session);
-      if (!readOnly) db.set("sessions", sessions);
-    } else reject('User expected')
-  });
 }
 
 function isGuestSession(req) {
@@ -1112,21 +1115,12 @@ function handleFileRequest(req, res, download) {
       filepath = utils.addThumbsPath(`/${[parts[2]]}`);
       fs.stat(filepath, (error, stats) => {
         if (error && error.code === "ENOENT") {
-          const dir = path.dirname(filepath);
-          fs.mkdir(dir, {recursive: true}, err => {
-            sharp(utils.addFilesPath(`/${[parts[2]]}`))
-              .resize(150, 150, {
-                fit: "inside",
-                position: "center"
-              })
-              .toFile(filepath, (err, inf) => {
-                if (!err) {
-                  fs.stat(filepath, (e, s) => {
-                    streamFile(req, res, filepath, false, s, false);
-                  });
-                }
-              });
-          });
+          makeImgThumb(parts[2]).then((imgInfo) => {
+            log.info("Create img thumb ", `${imgInfo.width}x${imgInfo.height} [${imgInfo.size} bytes]`);
+            fs.stat(filepath, (err, stats) => {
+              streamFile(req, res, filepath, false, stats, false);
+            });
+          })
         } else {
           streamFile(req, res, filepath, false, stats, false);
         }
@@ -1161,6 +1155,30 @@ function handleFileRequest(req, res, download) {
       res.end();
     }
     log.info(req, res);
+  });
+}
+
+async function makeImgThumb(imgPath) {
+  const thumbImgPath = utils.addThumbsPath(imgPath);
+  const origImgPath = utils.addFilesPath(imgPath);
+  const dir = path.dirname(thumbImgPath);
+  try {
+    fs.mkdir(dir, {force: true, mode: "755", recursive: true}, function () {});
+  } catch (e) {
+    log.error(e);
+  }
+  const imgFile = fs.readFileSync(origImgPath);
+  const origImg = sharp(imgFile);
+  return origImg.metadata().then(m => {
+    return {
+      w: Math.min(150, m.width),
+      h: Math.min(150, m.height)
+    }
+  }).then((info) => {
+    return origImg.resize(info.w, info.h, {
+      fit: "inside",
+      position: "center"
+    }).toFile(thumbImgPath);
   });
 }
 
@@ -1297,7 +1315,7 @@ function handleUploadRequest(req, res) {
   });
 
   req.on("close", async () => {
-    if (!done) {
+    if (!done && req.aborted) {
       log.info(req, res, "Upload cancelled");
 
       // remove all uploaded temp files on cancel

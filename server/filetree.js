@@ -203,21 +203,29 @@ filetree.del = function(dir) {
 filetree.unlink = function(dir) {
   lookAway();
   utils.rm(utils.addFilesPath(dir), err => {
-    if (err) log.error(err);
-    delete dirs[path.dirname(dir)].files[path.basename(dir)];
-    update(path.dirname(dir));
+    if (err) {
+      log.error(err);
+    } else {
+      delete dirs[path.dirname(dir)].files[path.basename(dir)];
+      utils.rm(utils.addThumbsPath(dir));
+      update(path.dirname(dir));
+    }
   });
 };
 
 filetree.unlinkdir = function(dir) {
   lookAway();
   utils.rm(utils.addFilesPath(dir), err => {
-    if (err) log.error(err);
-    delete dirs[dir];
-    Object.keys(dirs).forEach(d => {
-      if (new RegExp(`^${escRe(dir)}/`).test(d)) delete dirs[d];
-    });
-    update(path.dirname(dir));
+    if (err)  {
+      log.error(err);
+    } else {
+      delete dirs[dir];
+      Object.keys(dirs).forEach(d => {
+        if (new RegExp(`^${escRe(dir)}/`).test(d)) delete dirs[d];
+      });
+      utils.rm(utils.addThumbsPath(dir));
+      update(path.dirname(dir));
+    }
   });
 };
 
