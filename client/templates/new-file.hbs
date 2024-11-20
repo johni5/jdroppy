@@ -1,4 +1,15 @@
+{{#if gallery}}
+<div class="gallery-item item-type-file">
+  <div class="data-row new-file" data-type="file">
+    <a class="file-link entry-link">
+      <span class="sprite sprite-text"></span>
+      <span class="entry-name"></span>
+    </a>
+  </div>
+</div>
+{{else}}
 <div class="data-row new-file" data-type="file">
   <span class="sprite sprite-text"></span>
   <a class="file-link entry-link"></a>
 </div>
+{{/if}}

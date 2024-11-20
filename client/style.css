@@ -1686,3 +1686,15 @@ html:not(.mobile) #drop-select span.active {
 .button.clear-cache:hover {
   color: #f44;
 }
+
+img.rotate-90 {
+  transform: rotate(90deg);
+}
+
+img.rotate-180 {
+  transform: rotate(180deg);
+}
+
+img.rotate-270 {
+  transform: rotate(270deg);
+}

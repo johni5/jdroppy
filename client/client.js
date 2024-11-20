@@ -1978,7 +1978,7 @@ function loadMedia(view, files) {
         if ($(focused).hasClass("pswp__button")) focused.blur();
 
         view[0].currentFile = this.currItem.filename;
-        const imgButtons = view.find(".fit-h, .fit-v");
+        const imgButtons = view.find(".fit-h, .fit-v, .rotate");
         const videoButtons = view.find(".loop, .autonext");
         const zoomButtons = view.find(".zoom-in, .zoom-out");
 
@@ -2061,6 +2061,16 @@ function loadMedia(view, files) {
       view.find(".zoom-out").off("click").on("click", () => {
         const level = view[0].ps.getZoomLevel() / 1.5;
         view[0].ps.zoomTo(level, middle(view[0].ps), 250);
+      });
+      view.find(".rotate").off("click").on("click", () => {
+        let rotation = (view[0].ps.rotation || 0) + 90;
+        if (rotation >= 360) rotation = 0;
+        view[0].ps.rotation = rotation;
+        const img = $(view[0].ps.currItem.container).find("img.pswp__img");
+        img[0].classList.remove("rotate-90", "rotate-180", "rotate-270");
+        if (rotation > 0) {
+          img[0].classList.add("rotate-" + rotation);
+        }
       });
 
       view[0].ps.init();

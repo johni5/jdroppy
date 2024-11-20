@@ -662,11 +662,14 @@ function onWebSocketRequest(ws, req) {
           } else if (utils.extensionRe(exts.img).test(file)) {
             imgSize(path.join(utils.addFilesPath(dir), file), (err, dims) => {
               if (err) log.error(err);
-              resolve({
-                src: file,
-                w: dims && dims.width ? dims.width : 0,
-                h: dims && dims.height ? dims.height : 0,
-              });
+              let _w = dims && dims.width ? dims.width : 0;
+              let _h = dims && dims.height ? dims.height : 0;
+              if (dims && dims.orientation === 6) {
+                let _t = _w;
+                _w = _h;
+                _h = _t;
+              }
+              resolve({src: file, w: _w, h: _h});
             });
           } else {
             resolve({video: true, src: file});
