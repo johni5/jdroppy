@@ -31,6 +31,7 @@ const paths = require("./paths.js").get();
 const pkg = require("../package.json");
 const resources = require("./resources.js");
 const utils = require("./utils.js");
+const schedule = require('node-schedule');
 
 let cache = {};
 const clients = {};
@@ -39,6 +40,10 @@ let config = null;
 let firstRun = null;
 let ready = false;
 let dieOnError = true;
+let lastRequestTime = Date.now();
+const IDLE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+
+const thumbsCache = {};
 
 module.exports = async function droppy(opts, isStandalone, dev, callback) {
   if (isStandalone) {
@@ -66,7 +71,7 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
 
   try {
     await promisify((cb) => {
-      utils.mkdir([paths.files, paths.config], cb);
+      utils.mkdir([paths.files, paths.config, paths.thumbs], cb);
     })();
 
     await promisify((cb) => {
@@ -142,6 +147,44 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
       }
       cb();
     })();
+
+    await promisify((cb) => {
+      if (isStandalone) {
+        const startTime = new Date(Date.now() + 20 * 1000);
+        schedule.scheduleJob({
+          start: startTime,
+          rule: '*/5 * * * *' // every 5 minutes
+        }, () => {
+
+          if (isIdle()) {
+            const list = filetree.search(".jpg", "/") || [];
+            Object.keys(list).forEach((img) => {
+              if (isIdle()) thumbsCache[img] = thumbsCache[img] || false;
+            });
+
+            Object.keys(thumbsCache).forEach((img) => {
+              if (isIdle()) {
+                if (!thumbsCache[img]) {
+                  fs.stat(utils.addThumbsPath(img), (error, stats) => {
+                    if (error && error.code === "ENOENT") {
+                      makeImgThumb(img).then((imgInfo) => {
+                        thumbsCache[img] = true;
+                        log.info("Create img thumb ", `${imgInfo.width}x${imgInfo.height} [${imgInfo.size} bytes]`);
+                      })
+                    }
+                  });
+                }
+
+              }
+            });
+          }
+
+        });
+        log.info("Thumbs creator job is running");
+        cb();
+      } else cb();
+    })();
+
   } catch (err) {
     return callback(err);
   }
@@ -154,8 +197,14 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
   return {onRequest, setupWebSocket};
 };
 
+function isIdle() {
+  const idleTime = Date.now() - lastRequestTime;
+  return idleTime >= IDLE_THRESHOLD;
+}
+
 function onRequest(req, res) {
   req.time = Date.now();
+  lastRequestTime = Date.now();
 
   for (const [key, value] of Object.entries(config.headers || {})) {
     res.setHeader(key, value);
@@ -429,6 +478,7 @@ function onWebSocketRequest(ws, req) {
   clients[sid] = {views: [], cookie, ws};
 
   ws.on("message", async msg => {
+    lastRequestTime = Date.now();
     msg = JSON.parse(msg);
 
     if (msg.type !== "SAVE_FILE") {
@@ -1119,6 +1169,7 @@ function handleFileRequest(req, res, download) {
       fs.stat(filepath, (error, stats) => {
         if (error && error.code === "ENOENT") {
           makeImgThumb(parts[2]).then((imgInfo) => {
+            thumbsCache[parts[2]] = true;
             log.info("Create img thumb ", `${imgInfo.width}x${imgInfo.height} [${imgInfo.size} bytes]`);
             fs.stat(filepath, (err, stats) => {
               streamFile(req, res, filepath, false, stats, false);
@@ -1617,6 +1668,11 @@ function setupProcess(standalone) {
 function endProcess(signal) {
   let count = 0;
   log.info(`Received ${red(signal)} - Shutting down ...`);
+  try {
+    schedule.gracefulShutdown();
+    log.info(`Jobs stopped`);
+  } catch (e) {
+  }
   Object.keys(clients).forEach(sid => {
     if (!clients[sid] || !clients[sid].ws) return;
     if (clients[sid].ws.readyState < 2) {
