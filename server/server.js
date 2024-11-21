@@ -198,7 +198,7 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
                   if (cb1) {
                     setTimeout(() => {
                       cb1(cb1);
-                    }, 2000);
+                    }, 200);
                   }
                 }
               } else {
