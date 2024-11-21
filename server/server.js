@@ -41,7 +41,8 @@ let firstRun = null;
 let ready = false;
 let dieOnError = true;
 let lastRequestTime = Date.now();
-const IDLE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+let jobCounter = 0;
+let nothingChanges = true;
 
 const thumbsCache = {};
 
@@ -151,36 +152,69 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
     await promisify((cb) => {
       if (isStandalone) {
         const startTime = new Date(Date.now() + 20 * 1000);
+        const rule = `*/${config.jobPeriodMinutes} * * * *`;
         schedule.scheduleJob({
           start: startTime,
-          rule: '*/5 * * * *' // every 5 minutes
+          rule: rule
         }, () => {
 
+          log.debug(`Handle job, counter is [${jobCounter}]`);
           if (isIdle()) {
+
+            if (nothingChanges) return; // nothing changes
+            if (jobCounter > 0) return; // busy
+
+            log.debug('Check images for thumbs exists');
+
             const list = filetree.search(".jpg", "/") || [];
+            const jobList = [];
+            nothingChanges = true;
             Object.keys(list).forEach((img) => {
-              if (isIdle()) thumbsCache[img] = thumbsCache[img] || false;
-            });
-
-            Object.keys(thumbsCache).forEach((img) => {
-              if (isIdle()) {
-                if (!thumbsCache[img]) {
-                  fs.stat(utils.addThumbsPath(img), (error, stats) => {
-                    if (error && error.code === "ENOENT") {
-                      makeImgThumb(img).then((imgInfo) => {
-                        thumbsCache[img] = true;
-                        log.info("Create img thumb ", `${imgInfo.width}x${imgInfo.height} [${imgInfo.size} bytes]`);
-                      })
-                    }
-                  });
-                }
-
+              if (!thumbsCache[img]) {
+                thumbsCache[img] = false;
+                nothingChanges = false;
+                jobList[jobCounter++] = img;
               }
             });
+
+            log.debug(`Expected ${jobCounter} img thumbs`);
+
+            let processImg = async function(cb1) {
+              if(isIdle()) {
+                if (jobCounter > 0) {
+                  let img = jobList[--jobCounter];
+                  log.debug(`[${jobCounter}] Check for '${img}'`);
+                  if (!fs.existsSync(utils.addThumbsPath(img))) {
+                    try {
+                      const imgInfo = await makeImgThumb(img);
+                      thumbsCache[img] = true;
+                      log.info(`[${jobCounter}] Create img thumb '${img}' - `, `${imgInfo.width}x${imgInfo.height} [${imgInfo.size} bytes]`);
+                    } catch (e) {
+                      log.error(e);
+                    }
+                  } else {
+                    thumbsCache[img] = true;
+                  }
+                  if (cb1) {
+                    setTimeout(() => {
+                      cb1(cb1);
+                    }, 2000);
+                  }
+                }
+              } else {
+                jobCounter = 0;
+              }
+            };
+
+            processImg(processImg);
+
+
+          } else {
+            nothingChanges = false;
           }
 
         });
-        log.info("Thumbs creator job is running");
+        log.info(`Thumbs creator job is running by rule `, rule);
         cb();
       } else cb();
     })();
@@ -199,7 +233,7 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
 
 function isIdle() {
   const idleTime = Date.now() - lastRequestTime;
-  return idleTime >= IDLE_THRESHOLD;
+  return idleTime >= (config.jobIdleThresholdMinutes * 60 * 1000);
 }
 
 function onRequest(req, res) {

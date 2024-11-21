@@ -28,6 +28,8 @@ const defaults = {
   readOnly: false,
   ignorePatterns: [],
   watch: true,
+  jobIdleThresholdMinutes: 5,
+  jobPeriodMinutes: 1,
   headers: {},
 };
 
