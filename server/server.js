@@ -32,6 +32,7 @@ const pkg = require("../package.json");
 const resources = require("./resources.js");
 const utils = require("./utils.js");
 const schedule = require('node-schedule');
+const blacklist = require('./blacklist.json');
 
 let cache = {};
 const clients = {};
@@ -239,6 +240,12 @@ function isIdle() {
 function onRequest(req, res) {
   req.time = Date.now();
   lastRequestTime = Date.now();
+
+  if (inBlackList(req, res)) {
+    res.statusCode = 403;
+    res.end();
+    return;
+  }
 
   for (const [key, value] of Object.entries(config.headers || {})) {
     res.setHeader(key, value);
@@ -1717,4 +1724,18 @@ function endProcess(signal) {
   if (count > 0) log.info(`Closed ${count} WebSocket${count > 1 ? "s" : ""}`);
   try { fs.unlinkSync(paths.pid); } catch {}
   process.exit(0);
+}
+
+function inBlackList(req, res) {
+  const ip = utils.ip(req);
+  log.debug(`Check IP ${ip}`);
+  if (ip && blacklist.data) {
+    for (let entry of blacklist.data.entries()) {
+      if (entry[1]["ipAddress"] === ip){
+        log.debug(`!!! Block IP ${ip} !!!`);
+        return true;
+      }
+    }
+  }
+  return false;
 }
