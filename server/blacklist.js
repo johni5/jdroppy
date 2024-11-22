@@ -17,7 +17,6 @@ let apiKey;
 
 bl.load = function (abuseipdbKey, callback) {
   apiKey = abuseipdbKey;
-  console.log(abuseipdbKey);
   fs.stat(blFile, err => {
     if (err) {
       if (err.code === "ENOENT") {
