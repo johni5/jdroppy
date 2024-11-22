@@ -22,6 +22,7 @@ paths.get = function() {
     tlsKey: resolve(configDir, "tls.key"),
     tlsCert: resolve(configDir, "tls.cert"),
     tlsCA: resolve(configDir, "tls.ca"),
+    blcklist: resolve(configDir, "blacklist.json"),
 
     mod: resolve(__dirname, ".."),
     server: resolve(__dirname, "..", "server"),

@@ -32,7 +32,7 @@ const pkg = require("../package.json");
 const resources = require("./resources.js");
 const utils = require("./utils.js");
 const schedule = require('node-schedule');
-const blacklist = require('./blacklist.json');
+const bl = require('./blacklist.js');
 
 let cache = {};
 const clients = {};
@@ -151,6 +151,12 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
     })();
 
     await promisify((cb) => {
+      bl.load(config.abuseipdbKey, () => {
+        cb();
+      });
+    })();
+
+    await promisify((cb) => {
       if (isStandalone) {
         const startTime = new Date(Date.now() + 20 * 1000);
         const rule = `*/${config.jobPeriodMinutes} * * * *`;
@@ -237,11 +243,11 @@ function isIdle() {
   return idleTime >= (config.jobIdleThresholdMinutes * 60 * 1000);
 }
 
-function onRequest(req, res) {
+async function onRequest(req, res) {
   req.time = Date.now();
   lastRequestTime = Date.now();
 
-  if (inBlackList(req, res)) {
+  if (await bl.isBlack(utils.ip(req))) {
     res.statusCode = 403;
     res.end();
     return;
@@ -1724,18 +1730,4 @@ function endProcess(signal) {
   if (count > 0) log.info(`Closed ${count} WebSocket${count > 1 ? "s" : ""}`);
   try { fs.unlinkSync(paths.pid); } catch {}
   process.exit(0);
-}
-
-function inBlackList(req, res) {
-  const ip = utils.ip(req);
-  log.debug(`Check IP ${ip}`);
-  if (ip && blacklist.data) {
-    for (let entry of blacklist.data.entries()) {
-      if (entry[1]["ipAddress"] === ip){
-        log.debug(`!!! Block IP ${ip} !!!`);
-        return true;
-      }
-    }
-  }
-  return false;
 }

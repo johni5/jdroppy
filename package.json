@@ -15,6 +15,7 @@
     "test": "make test"
   },
   "dependencies": {
+    "axios": "^1.7.7",
     "busboy": "0.3.1",
     "chokidar": "3.4.2",
     "colorette": "1.2.1",
@@ -24,6 +25,7 @@
     "etag": "1.8.1",
     "file-extension": "4.0.5",
     "image-size": "0.8.3",
+    "ip": "^2.0.1",
     "isbinaryfile": "4.0.6",
     "json-buffer": "3.0.1",
     "lodash.debounce": "4.0.8",

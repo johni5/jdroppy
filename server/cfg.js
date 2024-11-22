@@ -30,6 +30,7 @@ const defaults = {
   watch: true,
   jobIdleThresholdMinutes: 5,
   jobPeriodMinutes: 1,
+  abuseipdbKey: '',
   headers: {},
 };
 
