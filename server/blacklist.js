@@ -11,12 +11,12 @@ const blFile = require("./paths.js").get().blcklist;
 const defaults = {meta: {generatedAt: Date.now() - 10}, data: []};
 let blacklist, watching, blackIPs = [], whiteIPs = [];
 
-const url = 'https://api.abuseipdb.com/api/v2';
-// const url = 'http://localhost:3000';
+let url;
 let apiKey;
 
-bl.load = function (abuseipdbKey, callback) {
+bl.load = function (abuseipdbKey, abuseipdbUrl, callback) {
   apiKey = abuseipdbKey;
+  url = abuseipdbUrl;
   fs.stat(blFile, err => {
     if (err) {
       if (err.code === "ENOENT") {
@@ -33,27 +33,49 @@ bl.load = function (abuseipdbKey, callback) {
         callback(err);
       }
     } else {
-
-      bl.parse(err => {
-        if (err) return callback(err);
-
-        const diffInDays = Math.round((Date.now() - Date.parse(blacklist.meta.generatedAt)) / (1000 * 60 * 60 * 24));
-        if (diffInDays > 1) {
-          log.info(`Blacklist is more then ${diffInDays} day(s) old. Try to get new one`);
-          updateBlacklist().then(() => {
-            write();
-            callback();
-          }).catch((err) => {
-            callback(err);
-          });
-        } else {
-          log.info(`Actual blacklist generated at ${blacklist.meta.generatedAt}`);
-          callback();
-        }
-      });
+      checkForActual(callback);
     }
   });
 };
+
+let lastCheck;
+
+function calculateHoursFromDate(date) {
+  return Math.floor((Date.now() - date) / (1000 * 60 * 60));
+}
+
+function checkForActual(callback) {
+
+  if (!lastCheck || calculateHoursFromDate(lastCheck) > 24) {
+    if (lastCheck) log.debug(`Last check hours: ${calculateHoursFromDate(lastCheck)}`);
+
+    lastCheck = Date.now();
+    whiteIPs = [];
+
+    bl.parse(err => {
+      if (err) return callback(err);
+
+      const hh = calculateHoursFromDate(Date.parse(blacklist.meta.generatedAt));
+      if (hh > 24) {
+        log.info(`Blacklist is more then ${hh} hours old. Try to get new one`);
+        updateBlacklist().then(() => {
+          write();
+          log.info(`Actual blacklist generated at ${blacklist.meta.generatedAt}`);
+          callback();
+        }).catch((err) => {
+          callback(err);
+        });
+      } else {
+        log.info(`Actual blacklist generated at ${blacklist.meta.generatedAt}`);
+        callback();
+      }
+    });
+  } else {
+    callback();
+  }
+
+}
+
 
 bl.parse = function (cb) {
   fs.readFile(blFile, "utf8", (err, data) => {
@@ -74,6 +96,8 @@ bl.parse = function (cb) {
 };
 
 bl.isBlack = async function (ip) {
+
+  checkForActual(() => {});
 
   if (ipcheck.isPrivate(ip) || whiteIPs.includes(ip)) return false;
   if (blackIPs.includes(ip)) return true;
@@ -112,12 +136,12 @@ async function checkIP(ip) {
     });
     if (response.data) {
       if (response.data.isWhitelisted === 'true') return true;
-      if (response.data.abuseConfidenceScore && response.data.abuseConfidenceScore > 90) return false;
+      if (response.data.abuseConfidenceScore && response.data.abuseConfidenceScore > 80) return false;
     }
   } catch (error) {
     log.error(error);
   }
-  log.info(`IP [${ip}] is unable to check`);
+  log.info(`IP [${ip}] is white`);
   return true;
 }
 

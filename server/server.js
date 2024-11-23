@@ -151,7 +151,7 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
     })();
 
     await promisify((cb) => {
-      bl.load(config.abuseipdbKey, () => {
+      bl.load(config.abuseipdbKey, config.abuseipdbUrl, () => {
         cb();
       });
     })();
@@ -245,13 +245,13 @@ function isIdle() {
 
 async function onRequest(req, res) {
   req.time = Date.now();
-  lastRequestTime = Date.now();
 
   if (await bl.isBlack(utils.ip(req))) {
     res.statusCode = 403;
     res.end();
     return;
   }
+  lastRequestTime = Date.now();
 
   for (const [key, value] of Object.entries(config.headers || {})) {
     res.setHeader(key, value);
@@ -935,6 +935,9 @@ function handleGETandHEAD(req, res) {
       handleResourceRequest(req, res, "auth.html");
     }
     return;
+  } else if (URI === "/abuseipdb-verification.html") {
+    res.writeHead(200, {"Content-Type": "text/plain; charset=utf-8"});
+    res.end("abuseipdb-verification-Psh8vohX");
   } else if (URI === "/robots.txt") {
     res.writeHead(200, {"Content-Type": "text/plain; charset=utf-8"});
     res.end("User-agent: *\nDisallow: /\n");
