@@ -938,6 +938,7 @@ function handleGETandHEAD(req, res) {
   } else if (URI === "/abuseipdb-verification.html") {
     res.writeHead(200, {"Content-Type": "text/plain; charset=utf-8"});
     res.end("abuseipdb-verification-Psh8vohX");
+    return;
   } else if (URI === "/robots.txt") {
     res.writeHead(200, {"Content-Type": "text/plain; charset=utf-8"});
     res.end("User-agent: *\nDisallow: /\n");
