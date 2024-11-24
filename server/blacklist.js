@@ -105,7 +105,7 @@ bl.isBlack = async function (ip) {
   if (blacklist.data) {
     for (let entry of blacklist.data.entries()) {
       if (entry[1]["ipAddress"] === ip) {
-        log.info(`IP [${ip}] is blocked`);
+        log.info(`IP [${ip}] is blacklisted`);
         blackIPs.push(ip);
         return true;
       }
@@ -116,15 +116,18 @@ bl.isBlack = async function (ip) {
   if (!check) {
     log.info(`IP [${ip}] is blocked`);
     blackIPs.push(ip);
-  } else {
-    whiteIPs.push(ip);
+    return true;
   }
+
+  log.info(`IP [${ip}] is whited`);
+  whiteIPs.push(ip);
   return false;
 };
 
 async function checkIP(ip) {
   try {
     const response = await axios.get(url + "/check", {
+      timeout: 5000,
       params: {
         ipAddress: ip,
         maxAgeInDays: 30
@@ -135,13 +138,13 @@ async function checkIP(ip) {
       }
     });
     if (response.data) {
-      if (response.data.isWhitelisted === 'true') return true;
-      if (response.data.abuseConfidenceScore && response.data.abuseConfidenceScore > 80) return false;
+      const score = response.data.abuseConfidenceScore;
+      log.info(`IP [${response.data.ipAddress}] has score ${score}`);
+      if (score >= 80) return false;
     }
   } catch (error) {
     log.error(error);
   }
-  log.info(`IP [${ip}] is white`);
   return true;
 }
 
@@ -168,12 +171,6 @@ async function updateBlacklist() {
   throw new Error('No data available');
 }
 
-// TODO: async
 function write() {
-  watching = false;
   fs.writeFileSync(blFile, JSON.stringify(blacklist));
-  // watch the file 1 second after last write
-  setTimeout(() => {
-    watching = true;
-  }, 1000);
 }
