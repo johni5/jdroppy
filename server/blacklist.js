@@ -46,7 +46,7 @@ function calculateHoursFromDate(date) {
 
 function checkForActual(callback) {
 
-  if (!lastCheck || calculateHoursFromDate(lastCheck) > 24) {
+  if (!lastCheck || calculateHoursFromDate(lastCheck) > 12) {
     if (lastCheck) log.debug(`Last check hours: ${calculateHoursFromDate(lastCheck)}`);
 
     lastCheck = Date.now();
@@ -137,9 +137,9 @@ async function checkIP(ip) {
         'Accept': 'application/json'
       }
     });
-    if (response.data) {
-      const score = response.data.abuseConfidenceScore;
-      log.info(`IP [${response.data.ipAddress}] has score ${score}`);
+    if (response.data && response.data.data) {
+      const score = response.data.data.abuseConfidenceScore;
+      log.info(`IP [${response.data.data.ipAddress}] has score ${score}`);
       if (score >= 80) return false;
     }
   } catch (error) {
