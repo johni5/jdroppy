@@ -33,6 +33,7 @@ const resources = require("./resources.js");
 const utils = require("./utils.js");
 const schedule = require('node-schedule');
 const bl = require('./blacklist.js');
+const monitor = require('./batterymonitor.js');
 
 let cache = {};
 const clients = {};
@@ -222,6 +223,22 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
 
         });
         log.info(`Thumbs creator job is running by rule `, rule);
+        cb();
+      } else cb();
+    })();
+
+    await promisify((cb) => {
+      if (isStandalone) {
+        const startTime = new Date(Date.now() + 20 * 1000);
+        const rule = `*/10 * * * *`;
+        schedule.scheduleJob({
+          start: startTime,
+          rule: rule
+        }, () => {
+          log.debug(`Handle monitor`);
+          monitor.checkCharge();
+        });
+        log.info(`Battery monitor job is running by rule `, rule);
         cb();
       } else cb();
     })();

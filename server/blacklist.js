@@ -172,5 +172,5 @@ async function updateBlacklist() {
 }
 
 function write() {
-  fs.writeFileSync(blFile, JSON.stringify(blacklist));
+  if (blacklist) fs.writeFileSync(blFile, JSON.stringify(blacklist));
 }
