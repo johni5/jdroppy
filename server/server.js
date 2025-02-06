@@ -230,7 +230,7 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
     await promisify((cb) => {
       if (isStandalone) {
         const startTime = new Date(Date.now() + 20 * 1000);
-        const rule = `*/10 * * * *`;
+        const rule = `*/1 * * * *`;
         schedule.scheduleJob({
           start: startTime,
           rule: rule
