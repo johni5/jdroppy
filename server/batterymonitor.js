@@ -74,7 +74,7 @@ function sendNotificationTG(t) {
 
 function readState(cb) {
   log.debug('run termux-battery-status');
-  exec('termux-battery-status', (error, stdout, stderr) => {
+  exec('/data/data/com.termux/files/usr/bin/termux-battery-status', (error, stdout, stderr) => {
     log.debug('error=', error, 'stdout=', stdout, 'stderr=', stderr);
     if (error) {
       processError(error.message);
