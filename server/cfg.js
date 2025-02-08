@@ -32,6 +32,12 @@ const defaults = {
   jobPeriodMinutes: 1,
   abuseipdbUrl: '',
   abuseipdbKey: '',
+  telegrammToken: '',
+  telegrammChatId: '',
+  monitorMinLevel: 50,
+  monitorMaxLevel: 90,
+  jobMonitorPeriodMinutes: 2,
+  jobMonitorPeriodCron: '0 12 * * *',
   headers: {},
 };
 

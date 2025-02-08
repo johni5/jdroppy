@@ -2,23 +2,20 @@
 
 const monitor = module.exports = {};
 const log = require("./log.js");
-const fs = require("fs");
 const jb = require("json-buffer");
 const axios = require("axios");
+const {exec} = require("child_process");
 
 const TG_SITE = "https://api.telegram.org";
-const TG_TOKEN = "7965447956:AAG0K2aNWKJUjdBC137t-KFN2KAQjB6DGsw";
-const TG_CHAT_ID = "300642737";
-let filePath = '/data/data/com.termux/files/home/.droppy/files/state.log',
-  lowLevel = 50,
-  highLevel = 90;
+let lowLevel, highLevel, tgToken, tgChatId;
 
-
-monitor.init = function (p = {}) {
-  filePath = p.filePath || filePath;
-  lowLevel = p.lowLevel || lowLevel;
-  highLevel = p.highLevel || highLevel;
-}
+monitor.init = function (_tgToken, _tgChatId, _lowLevel = 30, _highLevel = 90) {
+  tgToken = _tgToken;
+  tgChatId = _tgChatId;
+  lowLevel = _lowLevel;
+  highLevel = _highLevel;
+  sendNotificationTG(`Battery monitor started. Low level = ${lowLevel}, high level = ${highLevel}`);
+};
 
 /**
  * {
@@ -31,27 +28,17 @@ monitor.init = function (p = {}) {
  * }
  */
 monitor.checkCharge = function () {
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      processError(err);
-      return;
-    }
-    let info = jb.parse(data);
+  readState(info => {
     if (info.percentage < lowLevel && info.status === "DISCHARGING") {
       sendNotificationTG('Требуется подзарадка. Уровень заряда батареи ' + info.percentage);
     } else if (info.percentage > highLevel && info.status !== "DISCHARGING") {
       sendNotificationTG('Зарядку можно отключить. Уровень заряда батареи ' + info.percentage);
     }
   });
-}
+};
 
 monitor.sendInfo = function () {
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      processError(err);
-      return;
-    }
-    let info = jb.parse(data);
+  readState(info => {
     let m = "health: " + info.health + "\n\r" +
       "health: " + info.health + "\n\r" +
       "percentage: " + info.percentage + "\n\r" +
@@ -62,23 +49,18 @@ monitor.sendInfo = function () {
       "";
     sendNotificationTG(m);
   });
-}
+};
 
 function processError(err) {
-  let m;
-  if (err.code === "ENOENT") {
-    m = err.code + " " + filePath + ", file not found";
-  } else {
-    m = err.code + " " + filePath + ", read error";
-  }
+  let m = `Read battery status error: ${err}`;
   log.error(m);
   sendNotificationTG(m);
 }
 
 function sendNotificationTG(t) {
-  const url = `${TG_SITE}/bot${TG_TOKEN}/sendMessage`;
+  const url = `${TG_SITE}/bot${tgToken}/sendMessage`;
   axios.post(url, {
-    chat_id: TG_CHAT_ID,
+    chat_id: tgChatId,
     text: t
   }).then(r => {
     if (r.status !== 200) {
@@ -88,4 +70,21 @@ function sendNotificationTG(t) {
     log(err.request, err.response, 1, "TelegrammBot", err.message)
   })
 
+}
+
+function readState(cb) {
+  exec("termux-battery-status", (error, stdout, stderr) => {
+    if (error) {
+      processError(error.message);
+      return;
+    }
+    if (stderr) {
+      processError(stderr);
+      return;
+    }
+    if (stdout) {
+      log.debug('termux-battery-status', '->', stdout);
+      cb(jb.parse(stdout.trim()));
+    }
+  });
 }

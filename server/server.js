@@ -111,7 +111,8 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
       log.info("Loading resources ...");
       resources.load(config.dev, (err, c) => {
         log.info("Loading resources done");
-        cache = c; cb(err);
+        cache = c;
+        cb(err);
       });
     })();
 
@@ -120,11 +121,14 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
     })();
 
     await promisify((cb) => {
-      if (config.dev) debug(); cb();
+      if (config.dev) debug();
+      cb();
     })();
 
     await promisify((cb) => {
-      if (isStandalone) { startListeners(cb); } else cb();
+      if (isStandalone) {
+        startListeners(cb);
+      } else cb();
     })();
 
     await promisify((cb) => {
@@ -144,7 +148,8 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
             if (!clients[client].ws) return;
             try {
               clients[client].ws.ping();
-            } catch {}
+            } catch {
+            }
           });
         }, config.keepAlive);
       }
@@ -187,8 +192,8 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
 
             log.debug(`Expected ${jobCounter} img thumbs`);
 
-            let processImg = async function(cb1) {
-              if(isIdle()) {
+            let processImg = async function (cb1) {
+              if (isIdle()) {
                 if (jobCounter > 0) {
                   let img = jobList[--jobCounter];
                   log.debug(`[${jobCounter}] Check for '${img}'`);
@@ -229,8 +234,9 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
 
     await promisify((cb) => {
       if (isStandalone) {
+        monitor.init(config.telegrammToken, config.telegrammChatId, config.monitorMinLevel, config.monitorMaxLevel);
         const startTime = new Date(Date.now() + 20 * 1000);
-        const rule = `*/5 * * * *`;
+        const rule = `*/${config.jobMonitorPeriodMinutes} * * * *`;
         schedule.scheduleJob({
           start: startTime,
           rule: rule
@@ -239,6 +245,17 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
           monitor.checkCharge();
         });
         log.info(`Battery monitor job is running by rule `, rule);
+
+        if (config.jobMonitorPeriodCron && config.jobMonitorPeriodCron !== '') {
+          schedule.scheduleJob({
+            start: startTime,
+            rule: config.jobMonitorPeriodCron
+          }, () => {
+            log.debug(`Handle periodical state notifier`);
+            monitor.sendInfo();
+          });
+          log.info(`Periodical state notifier job is running by rule `, config.jobMonitorPeriodCron);
+        }
         cb();
       } else cb();
     })();
@@ -375,7 +392,7 @@ async function startListeners(callback) {
             "Error creating listener",
             `${target.opts.proto + (target.opts.socket ? "+unix://" : "://") +
             log.formatHostPort(target.host, target.port, target.opts.proto)
-            }: ${err.message}`
+              }: ${err.message}`
           );
           return resolve();
         }
@@ -561,19 +578,21 @@ function onWebSocketRequest(ws, req) {
     const isGuest = Boolean((session || {}).guest);
 
     if (msg.type === "REQUEST_SETTINGS") {
-      sendObj(sid, {type: "SETTINGS", vId, settings: {
-        priv,
-        version: pkg.version,
-        dev: config.dev,
-        public: config.public,
-        readOnly: config.readOnly,
-        watch: config.watch,
-        engine: `node ${process.version.substring(1)}`,
-        platform: process.platform,
-        caseSensitive: process.platform === "linux", // TODO: actually test the filesystem
-        themes: Object.keys(cache.themes).sort().join("|"),
-        modes: Object.keys(cache.modes).sort().join("|"),
-      }});
+      sendObj(sid, {
+        type: "SETTINGS", vId, settings: {
+          priv,
+          version: pkg.version,
+          dev: config.dev,
+          public: config.public,
+          readOnly: config.readOnly,
+          watch: config.watch,
+          engine: `node ${process.version.substring(1)}`,
+          platform: process.platform,
+          caseSensitive: process.platform === "linux", // TODO: actually test the filesystem
+          themes: Object.keys(cache.themes).sort().join("|"),
+          modes: Object.keys(cache.modes).sort().join("|"),
+        }
+      });
     } else if (msg.type === "REQUEST_UPDATE") {
       if (!validatePaths(msg.data, msg.type, ws, sid, vId)) return;
       if (!clients[sid]) clients[sid] = {views: [], ws}; // This can happen when the server restarts
@@ -588,7 +607,14 @@ function onWebSocketRequest(ws, req) {
           clientDir = path.dirname(msg.data);
           clientFile = path.basename(msg.data);
           if (msg.data.startsWith(rootLocation)) {
-            sendObj(sid, {type: "UPDATE_BE_FILE", file: clientFile, folder: clientDir, isFile: true, vId, rootLocation: rootLocation});
+            sendObj(sid, {
+              type: "UPDATE_BE_FILE",
+              file: clientFile,
+              folder: clientDir,
+              isFile: true,
+              vId,
+              rootLocation: rootLocation
+            });
           } else {
             clientDir = rootLocation;
             clientFile = null;
@@ -700,7 +726,7 @@ function onWebSocketRequest(ws, req) {
       const rDst = msg.data.dst;
       // Disallow whitespace-only and empty strings in renames
       if (!validatePaths([rSrc, rDst], msg.type, ws, sid, vId) ||
-          /^\s*$/.test(rDst) || rDst === "" || rSrc === rDst) {
+        /^\s*$/.test(rDst) || rDst === "" || rSrc === rDst) {
         log.info(ws, null, `Invalid rename request: ${rSrc}-> ${rDst}`);
         sendError(sid, vId, "Invalid rename request");
         return;
@@ -793,7 +819,7 @@ function onWebSocketRequest(ws, req) {
       sendObj(sid, {type: "MEDIA_FILES", vId, files: mediaFiles});
     } else if (msg.type === "SEARCH") {
       const query = msg.data.query;
-      const dir =  msg.data.dir;
+      const dir = msg.data.dir;
       if (!validatePaths(dir, msg.type, ws, sid, vId)) return;
       sendObj(sid, {
         type: "SEARCH_RESULTS",
@@ -829,7 +855,8 @@ async function clearCache() {
   const dir = utils.addThumbsPath("/");
   try {
     await fs.rm(dir, {force: true, recursive: true}, function () {
-      fs.mkdir(dir, {force: true, mode: "755", recursive: true}, function () {});
+      fs.mkdir(dir, {force: true, mode: "755", recursive: true}, function () {
+      });
     });
     log.info("Cache cleared successfully");
   } catch (e) {
@@ -1019,6 +1046,7 @@ function handleGETandHEAD(req, res) {
 }
 
 const rateLimited = [];
+
 function handlePOST(req, res) {
   const URI = decodeURIComponent(req.url);
   // unauthenticated POSTs
@@ -1062,8 +1090,8 @@ function handlePOST(req, res) {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     utils.readJsonBody(req).then(postData => {
       if (postData.username && postData.password &&
-          typeof postData.username === "string" &&
-          typeof postData.password === "string") {
+        typeof postData.username === "string" &&
+        typeof postData.password === "string") {
         db.addOrUpdateUser(postData.username, postData.password, true);
         cookies.create(req, res, postData);
         firstRun = false;
@@ -1256,7 +1284,7 @@ function handleFileRequest(req, res, download) {
   fs.stat(filepath, (error, stats) => {
     if (!error && stats) {
       if (stats.isDirectory() && shareLink) {
-        if(download) {
+        if (download) {
           streamArchive(req, res, filepath, download, stats, shareLink);
         } else {
           cookies.free(req, res, {location: location});
@@ -1285,7 +1313,8 @@ async function makeImgThumb(imgPath) {
   const origImgPath = utils.addFilesPath(imgPath);
   const dir = path.dirname(thumbImgPath);
   try {
-    fs.mkdir(dir, {force: true, mode: "755", recursive: true}, function () {});
+    fs.mkdir(dir, {force: true, mode: "755", recursive: true}, function () {
+    });
   } catch (e) {
     log.error(e);
   }
@@ -1488,7 +1517,7 @@ function updateClientLocation(dir, sid, vId) {
   if (!clientsPerDir[dir]) clientsPerDir[dir] = [];
   clientsPerDir[dir].push({
     sid, vId,
-    update: throttle(function() {
+    update: throttle(function () {
       sendFiles(this.sid, this.vId);
     }, config.updateInterval, {leading: true, trailing: true})
   });
@@ -1543,7 +1572,7 @@ function cleanupLinks(callback) {
   } else {
     Object.keys(links).forEach(link => {
       linkcount++;
-      (function(shareLink, location) {
+      (function (shareLink, location) {
         // check for links not matching the configured length
         if (shareLink.length !== config.linkLength) {
           log.debug(`deleting link not matching the configured length: ${shareLink}`);
@@ -1676,6 +1705,7 @@ function validateRequest(req) {
 }
 
 const cbs = [];
+
 function tlsInit(opts, cb) {
   if (!cbs[opts.index]) {
     cbs[opts.index] = [cb];
@@ -1749,6 +1779,9 @@ function endProcess(signal) {
     }
   });
   if (count > 0) log.info(`Closed ${count} WebSocket${count > 1 ? "s" : ""}`);
-  try { fs.unlinkSync(paths.pid); } catch {}
+  try {
+    fs.unlinkSync(paths.pid);
+  } catch {
+  }
   process.exit(0);
 }
