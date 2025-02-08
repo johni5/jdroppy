@@ -4,10 +4,11 @@ const monitor = module.exports = {};
 const log = require("./log.js");
 const jb = require("json-buffer");
 const axios = require("axios");
-const {exec} = require("child_process");
+const {exec} = require("node:child_process");
 
 const TG_SITE = "https://api.telegram.org";
 let lowLevel, highLevel, tgToken, tgChatId;
+//const termuxProcess = spawn("/data/data/com.termux/files/home/battery-monitor.sh");
 
 monitor.init = function (_tgToken, _tgChatId, _lowLevel = 30, _highLevel = 90) {
   tgToken = _tgToken;
@@ -29,24 +30,17 @@ monitor.init = function (_tgToken, _tgChatId, _lowLevel = 30, _highLevel = 90) {
  */
 monitor.checkCharge = function () {
   readState(info => {
-    if (info.percentage < lowLevel && info.status === "DISCHARGING") {
-      sendNotificationTG('Требуется подзарадка. Уровень заряда батареи ' + info.percentage);
-    } else if (info.percentage > highLevel && info.status !== "DISCHARGING") {
-      sendNotificationTG('Зарядку можно отключить. Уровень заряда батареи ' + info.percentage);
+    if (info.capacity < lowLevel && info.status === "Discharging") {
+      sendNotificationTG('Требуется подзарадка. Уровень заряда батареи ' + info.capacity);
+    } else if (info.capacity > highLevel && info.status !== "Discharging") {
+      sendNotificationTG('Зарядку можно отключить. Уровень заряда батареи ' + info.capacity);
     }
   });
 };
 
 monitor.sendInfo = function () {
   readState(info => {
-    let m = "health: " + info.health + "\n\r" +
-      "health: " + info.health + "\n\r" +
-      "percentage: " + info.percentage + "\n\r" +
-      "plugged: " + info.plugged + "\n\r" +
-      "status: " + info.status + "\n\r" +
-      "temperature: " + info.temperature + "\n\r" +
-      "current: " + info.current +
-      "";
+    let m = `status=${info.status}, capacity=${info.capacity}`;
     sendNotificationTG(m);
   });
 };
@@ -73,8 +67,7 @@ function sendNotificationTG(t) {
 }
 
 function readState(cb) {
-  log.debug('run termux-battery-status');
-  exec('/data/data/com.termux/files/usr/bin/termux-battery-status', (error, stdout, stderr) => {
+  exec('"/data/data/com.termux/files/home/battery-monitor.sh"', (error, stdout, stderr) => {
     log.debug('error=', error, 'stdout=', stdout, 'stderr=', stderr);
     if (error) {
       processError(error.message);
