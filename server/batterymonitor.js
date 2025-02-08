@@ -5,10 +5,39 @@ const log = require("./log.js");
 const jb = require("json-buffer");
 const axios = require("axios");
 const {exec} = require("node:child_process");
+const util = require("util");
+const execPromise = util.promisify(exec);
 
 const TG_SITE = "https://api.telegram.org";
 let lowLevel, highLevel, tgToken, tgChatId;
-//const termuxProcess = spawn("/data/data/com.termux/files/home/battery-monitor.sh");
+
+const toText = function (val) {
+  if (val && val !== '') {
+    return val.trim();
+  }
+  return 'NAN';
+};
+
+const toInt = function (val) {
+  if (val && val !== '') {
+    try {
+      return parseInt(val);
+    } catch (e) {
+    }
+  }
+  return 0;
+};
+
+const toFloat = function (val) {
+  if (val && val !== '') {
+    try {
+      return parseFloat(val) / 1000000;
+    } catch (e) {
+    }
+  }
+  return 0.0;
+};
+
 
 monitor.init = function (_tgToken, _tgChatId, _lowLevel = 30, _highLevel = 90) {
   tgToken = _tgToken;
@@ -18,30 +47,25 @@ monitor.init = function (_tgToken, _tgChatId, _lowLevel = 30, _highLevel = 90) {
   sendNotificationTG(`Battery monitor started. Low level = ${lowLevel}, high level = ${highLevel}`);
 };
 
-/**
- * {
- *   "health": "GOOD",
- *   "percentage": 83,
- *   "plugged": "UNPLUGGED",
- *   "status": "DISCHARGING",
- *   "temperature": 26.299999237060547,
- *   "current": 28000
- * }
- */
 monitor.checkCharge = function () {
-  readState(info => {
+  readState().then(info => {
     if (info.capacity < lowLevel && info.status === "Discharging") {
       sendNotificationTG('Требуется подзарадка. Уровень заряда батареи ' + info.capacity);
     } else if (info.capacity > highLevel && info.status !== "Discharging") {
       sendNotificationTG('Зарядку можно отключить. Уровень заряда батареи ' + info.capacity);
     }
+  }).catch(error => {
+    processError(error.message);
   });
 };
 
 monitor.sendInfo = function () {
-  readState(info => {
-    let m = `status=${info.status}, capacity=${info.capacity}`;
+  readState().then(info => {
+    let m = `Состояние батареи:\nНапряжение=${info.voltage_V}В\nТок=${info.current_mA}мА\n` +
+      `Уровень заряда=${info.capacity}%\nТемпература=${info.temp_G}°\nСостояние=${info.status}`;
     sendNotificationTG(m);
+  }).catch(error => {
+    processError(error.message);
   });
 };
 
@@ -66,20 +90,27 @@ function sendNotificationTG(t) {
 
 }
 
-function readState(cb) {
-  exec('"/data/data/com.termux/files/home/battery-monitor.sh"', (error, stdout, stderr) => {
-    log.debug('error=', error, 'stdout=', stdout, 'stderr=', stderr);
-    if (error) {
-      processError(error.message);
-      return;
-    }
+async function readState() {
+  let p = {};
+  p.status = await cat('status', toText);
+  p.capacity = await cat('capacity', toInt);
+  p.current_mA = await cat('current_now', toFloat) * 1000.0;
+  p.temp_G = await cat('temp', toInt) * 1.0 / 10;
+  p.voltage_V = await cat('voltage_now', toFloat);
+  return p;
+}
+
+async function cat(val, format) {
+  try {
+    const {stdout, stderr} = await execPromise(`cat /sys/class/power_supply/battery/${val}`);
     if (stderr) {
-      processError(stderr);
-      return;
+      log.error('Read ${val} ERROR:', ' ', stderr);
+      return format('');
     }
-    if (stdout) {
-      log.debug('termux-battery-status', '->', stdout);
-      cb(jb.parse(stdout.trim()));
-    }
-  });
+    log.debug(`Read '${val}':${stdout}`);
+    return format(stdout);
+  } catch (error) {
+    log.error(`Read '${val}' ERROR:`, ' ', error.message);
+    return format('');
+  }
 }
