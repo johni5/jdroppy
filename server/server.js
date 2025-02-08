@@ -256,6 +256,7 @@ module.exports = async function droppy(opts, isStandalone, dev, callback) {
           });
           log.info(`Periodical state notifier job is running by rule `, config.jobMonitorPeriodCron);
         }
+        monitor.sendInfo();
         cb();
       } else cb();
     })();
