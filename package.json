@@ -36,6 +36,7 @@
     "mv": "2.1.1",
     "node-cron": "^3.0.3",
     "node-schedule": "^2.1.1",
+    "node-telegram-bot-api": "^0.66.0",
     "original-url": "1.2.3",
     "plyr": "3.6.2",
     "ps-node": "0.1.6",

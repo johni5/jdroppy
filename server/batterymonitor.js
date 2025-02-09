@@ -7,9 +7,11 @@ const axios = require("axios");
 const {exec} = require("node:child_process");
 const util = require("util");
 const execPromise = util.promisify(exec);
+const TelegramBot = require("node-telegram-bot-api");
 
 const TG_SITE = "https://api.telegram.org";
 let lowLevel, highLevel, tgToken, tgChatId;
+let bot;
 
 const toText = function (val) {
   if (val && val !== '') {
@@ -38,13 +40,21 @@ const toFloat = function (val) {
   return 0.0;
 };
 
-
 monitor.init = function (_tgToken, _tgChatId, _lowLevel = 30, _highLevel = 90) {
   tgToken = _tgToken;
   tgChatId = _tgChatId;
   lowLevel = _lowLevel;
   highLevel = _highLevel;
-  sendNotificationTG(`Battery monitor started. Low level = ${lowLevel}, high level = ${highLevel}`);
+  bot = new TelegramBot(tgToken, {polling: true});
+  bot.onText(/state/i, (msg) => {
+    const chatId = msg.chat.id;
+    readState().then(info => {
+      bot.sendMessage(chatId, stateMsg(info), {parse_mode: "Markdown"});
+    }).catch(error => {
+      bot.sendMessage(chatId, error.message, {parse_mode: "Markdown"});
+    });
+  });
+  sendNotificationTG(`Запуск мониторинка батареи.\nLow level = ${lowLevel}\nHigh level = ${highLevel}`);
 };
 
 monitor.checkCharge = function () {
@@ -61,13 +71,16 @@ monitor.checkCharge = function () {
 
 monitor.sendInfo = function () {
   readState().then(info => {
-    let m = `Состояние батареи:\nНапряжение=${info.voltage_V}В\nТок=${info.current_mA}мА\n` +
-      `Уровень заряда=${info.capacity}%\nТемпература=${info.temp_G}°\nСостояние=${info.status}`;
-    sendNotificationTG(m);
+    sendNotificationTG(stateMsg(info));
   }).catch(error => {
     processError(error.message);
   });
 };
+
+function stateMsg(info) {
+  return `Состояние батареи:\nНапряжение=${info.voltage_V}В\nТок=${info.current_mA}мА\n` +
+    `Уровень заряда=${info.capacity}%\nТемпература=${info.temp_G}°\nСостояние=${info.status}`;
+}
 
 function processError(err) {
   let m = `Read battery status error: ${err}`;
