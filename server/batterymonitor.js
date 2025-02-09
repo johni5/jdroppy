@@ -54,7 +54,7 @@ monitor.init = function (_tgToken, _tgChatId, _lowLevel = 30, _highLevel = 90) {
       bot.sendMessage(chatId, error.message, {parse_mode: "Markdown"});
     });
   });
-  sendNotificationTG(`Запуск мониторинка батареи.\nLow level = ${lowLevel}\nHigh level = ${highLevel}`);
+  sendNotificationTG(`Запуск мониторинга.\nLow level = ${lowLevel}\nHigh level = ${highLevel}`);
 };
 
 monitor.checkCharge = function () {
