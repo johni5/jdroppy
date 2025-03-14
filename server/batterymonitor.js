@@ -61,7 +61,7 @@ monitor.checkCharge = function () {
   readState().then(info => {
     if (info.capacity < lowLevel && info.status === "Discharging") {
       sendNotificationTG('Требуется подзарадка. Уровень заряда батареи ' + info.capacity);
-    } else if (info.capacity > highLevel && info.status !== "Discharging") {
+    } else if (info.capacity > highLevel && (info.status !== "Discharging" && info.status !== "Full")) {
       sendNotificationTG('Зарядку можно отключить. Уровень заряда батареи ' + info.capacity);
     }
   }).catch(error => {
