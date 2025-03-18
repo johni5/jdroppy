@@ -10,7 +10,8 @@ const execPromise = util.promisify(exec);
 const TelegramBot = require("node-telegram-bot-api");
 
 const TG_SITE = "https://api.telegram.org";
-let lowLevel, highLevel, tgToken, tgChatId;
+const TIME_BETWEEN_NOTIFICATIONS_MINUTES = 10;
+let lowLevel, highLevel, tgToken, tgChatId, lastNotificationDate;
 let bot;
 
 const toText = function (val) {
@@ -59,10 +60,17 @@ monitor.init = function (_tgToken, _tgChatId, _lowLevel = 30, _highLevel = 90) {
 
 monitor.checkCharge = function () {
   readState().then(info => {
-    if (info.capacity < lowLevel && info.status === "Discharging") {
-      sendNotificationTG('Требуется подзарадка. Уровень заряда батареи ' + info.capacity);
-    } else if (info.capacity > highLevel && (info.status !== "Discharging" && info.status !== "Full")) {
-      sendNotificationTG('Зарядку можно отключить. Уровень заряда батареи ' + info.capacity);
+    const now = new Date();
+    if (!lastNotificationDate || (now - lastNotificationDate) > TIME_BETWEEN_NOTIFICATIONS_MINUTES * 60 * 1000) {
+      if (info.capacity < lowLevel && info.status === "Discharging") {
+        sendNotificationTG('Требуется подзарадка. Уровень заряда батареи ' + info.capacity);
+        lastNotificationDate = now;
+      } else if (info.capacity > highLevel && info.status === "Charging") {
+        sendNotificationTG('Зарядку можно отключить. Уровень заряда батареи ' + info.capacity);
+        lastNotificationDate = now;
+      } else {
+        lastNotificationDate = null;
+      }
     }
   }).catch(error => {
     processError(error.message);
